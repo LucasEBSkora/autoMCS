@@ -7,7 +7,9 @@ from numpy import int32, int8, ravel, zeros, array, float32, mean
 from os import system # clearing image folder
 
 class BoardReader:
-	piece_types = {
+	'''reads images from camera and translates to a chess board matrix with piece positions'''
+
+	piece_types = { 
 		4: '♟',
 		5: '♜',
 		6: '♞',
@@ -21,6 +23,7 @@ class BoardReader:
 		14: '♔',
 		15: '♕',
 	}
+	'''maps aruco IDs to chess piece and color'''
 
 	def __init__(self, resolution = (1920, 1280), board_dimensions = (12, 8), write_steps = False):
 		self.resolution = int32(resolution)
@@ -41,6 +44,7 @@ class BoardReader:
 			print("failed to set frame height")
 			exit(-1)
 
+		# default buffer size is 10, meaning we get "very old images" instead of the latest
 		ret = self.cap.set(CAP_PROP_BUFFERSIZE, 1)
 
 		if (ret != True):
@@ -50,13 +54,19 @@ class BoardReader:
 		self.dictionary = aruco.Dictionary_get(aruco.DICT_4X4_50)
 
 		if self.write_steps == True:
-			system("rm arucos/*")
-			self.now = datetime.now().strftime("%Y.%m.%d-%H:%M:%S")
+			system("rm arucos/*") # clears aruco image folder so we don't get images we already have through scp command
+			self.now = self._getTimeString() # gets current time string to use in image names
+
+	def _getTimeString():
+		datetime.now().strftime("%Y.%m.%d-%H:%M:%S")
 
 	def __del__(self):
+		# releases camera resource
 		self.cap.release()
 
+	
 	def _getArucoCorners(self):
+		'''gets frame from camera and detects aruco codes, returning the coordinates of their corners'''
 		ret, img = self.cap.read()
 		if ret != True:
 			print("failed to read image!")
@@ -71,20 +81,22 @@ class BoardReader:
 
 		corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.dictionary)
 
+		if ids is None:
+			return []
+
 		if self.write_steps == True:
 			self.img = img
 
 		ids = ravel(ids)
 
 		unravel_corners = []
-		if ids[0] != None:
-			for i in range(len(ids)):
-				unravel_corners.append(corners[i][0])
-			return [ids, int32(unravel_corners)]
-		else:
-			return []
+		for i in range(len(ids)):
+			unravel_corners.append(corners[i][0])
+	
+		return [ids, int32(unravel_corners)]
 
 	def _getBoardCorners(self, ids_and_corners):
+		'''Gets coordinates of the four corners of the board'''
 		corners = zeros((4, 2), int32)
 		LL = None
 		LR = None
@@ -117,7 +129,7 @@ class BoardReader:
 			if UL is None:
 				print("didn't find upper left corner!")
 
-			return [], ids_and_corners
+			return None
 
 		corners = array([LL, LR, UR, UL])
 		
@@ -128,6 +140,7 @@ class BoardReader:
 		return corners
 
 	def _trasformPerspective(self, board_corners, ids_and_corners):
+		'''applies a perspective transformation to the corner cordinates mapping the corners of the board to the corners of the image'''
 		image_corners = float32([[0, self.resolution[1]],  self.resolution, [self.resolution[0], 0], [0, 0]])
 		matrix = getPerspectiveTransform(float32(board_corners), image_corners)
 		
@@ -154,6 +167,7 @@ class BoardReader:
 		return ids_and_corners
 
 	def _getPieceCenters(self, ids_and_corners):
+		'''gets the center of each chess piece identified in the image'''
 		filtered_ids = []
 		piece_centers = []
 		for i in range(len(ids_and_corners[0])):
@@ -191,6 +205,7 @@ class BoardReader:
 		return board
 
 	def printBoard(self, board):
+		'''pretty prints the chess board matrix'''
 		for i in range(board.shape[1] - 1, -1, -1):
 			line = ""
 			for j in range(board.shape[0]):
@@ -207,15 +222,21 @@ class BoardReader:
 			print(line)
 
 	def getBoard(self):
+		''' takes picture and gets chess board matrix from it'''
 		if self.write_steps == True:
-			self.now = datetime.now().strftime("%Y.%m.%d-%H:%M:%S")
+			self.now = self._getTimeString()
 		
 		ids_and_corners = self._getArucoCorners()
-		if len(ids_and_corners) > 0:
+		if len(ids_and_corners) == 0:
 			return None
-	
+
 		board_corners, ids_and_corners = self._getBoardCorners(ids_and_corners)
-		piece_centers = self._getPieceCenters(ids_and_corners)
+		if board_corners is None:
+			return None
+		
+		ids_and_transformed_corners = self._trasformPerspective(board_corners, ids_and_corners)
+
+		piece_centers = self._getPieceCenters(ids_and_transformed_corners)
 		board = self._generateBoard(board_corners, piece_centers)
 		return board
 		
