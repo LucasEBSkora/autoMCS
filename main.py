@@ -14,6 +14,6 @@ reader = BoardReader(resolution, board_dimensions, True)
 
 board = reader.getBoard()
 if board is None:
-  reader.printBoard(board)
-else:
   print(":(")
+else:
+  reader.printBoard(board)

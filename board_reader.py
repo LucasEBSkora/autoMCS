@@ -1,8 +1,9 @@
+from cv2 import __version__ as cv2_version
 from cv2 import aruco, VideoCapture, cvtColor, COLOR_RGB2GRAY, getPerspectiveTransform, perspectiveTransform # indispensable
 from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_PROP_BUFFERSIZE # camera properties
 from cv2 import imwrite, polylines, line, putText, circle, warpPerspective, FONT_HERSHEY_DUPLEX # for debug image printing
+from cv2 import imread # used for tests
 from datetime import datetime # debug image printing
-import numpy as np
 from numpy import int32, int8, ravel, zeros, array, float32, mean
 from os import system # clearing image folder
 
@@ -25,66 +26,84 @@ class BoardReader:
 	}
 	'''maps aruco IDs to chess piece and color'''
 
-	def __init__(self, resolution = (1920, 1280), board_dimensions = (12, 8), write_steps = False):
+	def __init__(self, resolution = (1920, 1280), board_dimensions = (12, 8), write_steps = False, DEBUG_MODE = False):
 		self.resolution = int32(resolution)
 		self.board_dimensions = int32(board_dimensions)
 		self.write_steps = write_steps
+		self.DEBUG_MODE = DEBUG_MODE
+		if self.DEBUG_MODE:
+			self.debug_path = None
 
-		self.cap = VideoCapture(0)
+		if not self.DEBUG_MODE:
+			self.cap = VideoCapture(0)
 
-		ret = self.cap.set(CAP_PROP_FRAME_WIDTH, resolution[0])
+			ret = self.cap.set(CAP_PROP_FRAME_WIDTH, resolution[0])
 
-		if (ret != True):
-			print("failed to set frame width")
-			exit(-1)
+			if (ret != True):
+				print("failed to set frame width")
+				exit(-1)
 
-		ret = self.cap.set(CAP_PROP_FRAME_HEIGHT,resolution[1])
+			ret = self.cap.set(CAP_PROP_FRAME_HEIGHT,resolution[1])
 
-		if (ret != True):
-			print("failed to set frame height")
-			exit(-1)
+			if (ret != True):
+				print("failed to set frame height")
+				exit(-1)
 
-		# default buffer size is 10, meaning we get "very old images" instead of the latest
-		ret = self.cap.set(CAP_PROP_BUFFERSIZE, 1)
+			# default buffer size is 10, meaning we get "very old images" instead of the latest
+			ret = self.cap.set(CAP_PROP_BUFFERSIZE, 1)
 
-		if (ret != True):
-			print("failed to set buffer size")
-			exit(-1)
-		
-		self.dictionary = aruco.Dictionary_get(aruco.DICT_4X4_50)
+			if (ret != True):
+				print("failed to set buffer size")
+				exit(-1)
 
-		if self.write_steps == True:
+		if cv2_version == '4.7.0':
+			dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+			self.arucoDetector = aruco.ArucoDetector(dictionary)
+		else:
+			self.dictionary = aruco.Dictionary_get(aruco.DICT_4X4_50)
+
+		self.last_position_corners = None
+
+		if self.write_steps:
 			system("rm arucos/*") # clears aruco image folder so we don't get images we already have through scp command
 			self.now = self._getTimeString() # gets current time string to use in image names
 
-	def _getTimeString():
-		datetime.now().strftime("%Y.%m.%d-%H:%M:%S")
+	def _getTimeString(self):
+		if self.DEBUG_MODE and not self.debug_path is None:
+			return self.debug_path.split('/')[1]
+		else: 
+			return datetime.now().strftime("%Y.%m.%d-%H:%M:%S")
 
 	def __del__(self):
 		# releases camera resource
-		self.cap.release()
+		if not self.DEBUG_MODE:
+			self.cap.release()
 
-	
 	def _getArucoCorners(self):
 		'''gets frame from camera and detects aruco codes, returning the coordinates of their corners'''
-		ret, img = self.cap.read()
-		if ret != True:
-			print("failed to read image!")
-			return []
+		if self.DEBUG_MODE:
+			img = imread(self.debug_path)
+		else:
+			ret, img = self.cap.read()
+			if ret != True:
+				print("failed to read image!")
+				return []
+			print("image read!")
 
-		print("image read!")
 		gray = cvtColor(img, COLOR_RGB2GRAY)
 
-		if self.write_steps == True:
+		if self.write_steps:
 			imwrite(f"arucos/{self.now}_RAW.png", img)
 			imwrite(f"arucos/{self.now}_GRAY.png", gray)
-
-		corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.dictionary)
+		if cv2_version == '4.7.0':
+			corners, ids, rejectedImgPoints = self.arucoDetector.detectMarkers(gray)
+		else:
+			corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.dictionary)
 
 		if ids is None:
 			return []
 
-		if self.write_steps == True:
+		if self.write_steps:
 			self.img = img
 
 		ids = ravel(ids)
@@ -98,42 +117,42 @@ class BoardReader:
 	def _getBoardCorners(self, ids_and_corners):
 		'''Gets coordinates of the four corners of the board'''
 		corners = zeros((4, 2), int32)
-		LL = None
-		LR = None
-		UR = None
-		UL = None
+		found_corner = [0] * 4
 
-		corners_found = 0
 		for i in range(len(ids_and_corners[0])):
 			id = ids_and_corners[0][i]
-			if id == 0:
-				LL = ids_and_corners[1][i][0]
-				corners_found += 1
-			elif id == 1:
-				LR = ids_and_corners[1][i][0]
-				corners_found += 1
-			elif id == 2:
-				UR = ids_and_corners[1][i][0]
-				corners_found += 1
-			elif id == 3:
-				UL = ids_and_corners[1][i][0]
-				corners_found += 1
-		if corners_found != 4:
+			if 0 <= id and id <= 3:
+				found_corner[id] += 1
+				corners[id] = ids_and_corners[1][i][0]
+
+		found_all_corners = True
+		for i in range(0, 4):
+			if found_corner[i] != 1:
+				found_all_corners = False
+
+		if not found_all_corners:
+			corners_found = sum(found_corner)
 			print(f"found {corners_found} corners only!")
-			if LL is None:
+			if found_corner[0] == 0:
 				print("didn't find lower left corner!")
-			if LR is None:
+			if found_corner[1] == 0:
 				print("didn't find lower right corner!")
-			if UR is None:
+			if found_corner[2] == 0:
 				print("didn't find upper right corner!")
-			if UL is None:
+			if found_corner[3] == 0:
 				print("didn't find upper left corner!")
 
-			return None
+			if not self.last_position_corners is None:
+				for i in range(0, 4):
+					if found_corner[i] == 0:
+						corners[i] = self.last_position_corners[i]
+			else:
+				print("can't find all points!")
+				return None
 
-		corners = array([LL, LR, UR, UL])
+		self.last_position_corners = corners
 		
-		if self.write_steps == True:
+		if self.write_steps:
 			self.img = polylines(self.img, int32([corners]), True, (0, 255, 0), 5)
 			imwrite(f"arucos/{self.now}_BORDER.png", self.img)
 
@@ -144,7 +163,7 @@ class BoardReader:
 		image_corners = float32([[0, self.resolution[1]],  self.resolution, [self.resolution[0], 0], [0, 0]])
 		matrix = getPerspectiveTransform(float32(board_corners), image_corners)
 		
-		if self.write_steps == True:
+		if self.write_steps:
 			self.img = warpPerspective(self.img, matrix, self.resolution)
 			inc = self.resolution / self.board_dimensions
 			
@@ -175,7 +194,7 @@ class BoardReader:
 			corners = ids_and_corners[1][i]
 			if 4 <= id and id <= 15:
 				center = mean(corners, axis=0)
-				if self.write_steps == True:
+				if self.write_steps:
 					self.img = putText(self.img, str(id), int32(center), FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 1)
 					self.img = circle(self.img, int32(center), 1, (0, 0, 255), 5)
 				filtered_ids.append(id)
@@ -223,14 +242,14 @@ class BoardReader:
 
 	def getBoard(self):
 		''' takes picture and gets chess board matrix from it'''
-		if self.write_steps == True:
+		if self.write_steps:
 			self.now = self._getTimeString()
 		
 		ids_and_corners = self._getArucoCorners()
 		if len(ids_and_corners) == 0:
 			return None
 
-		board_corners, ids_and_corners = self._getBoardCorners(ids_and_corners)
+		board_corners = self._getBoardCorners(ids_and_corners)
 		if board_corners is None:
 			return None
 		
