@@ -12,8 +12,13 @@ board_dimensions = (12, 8)
 
 reader = BoardReader(resolution, board_dimensions, True)
 
-board = reader.getBoard()
-if board is None:
-  print(":(")
-else:
-  reader.printBoard(board)
+finish_game = ""
+
+while finish_game != "q":
+	board = reader.getBoard()
+	if board is None:
+		print(":(")
+	else:
+		reader.printBoard(board)
+	print("press q and write enter to finish game")
+	finish_game = input()

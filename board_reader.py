@@ -49,12 +49,25 @@ class BoardReader:
 				print("failed to set frame height")
 				exit(-1)
 
-			# default buffer size is 10, meaning we get "very old images" instead of the latest
+			# default buffer size is 10, meaning we get "very old" images instead of the latest
 			ret = self.cap.set(CAP_PROP_BUFFERSIZE, 1)
 
 			if (ret != True):
 				print("failed to set buffer size")
 				exit(-1)
+
+			ret = self.cap.set(cv2.CAP_PROP_FPS, 1)
+
+			if (ret != True):
+				print("failed to set FPS")
+				exit(-1)
+
+			ret = self.cap.set(cv2.CAP_PROP_SHARPNESS, 100)
+
+			if (ret != True):
+				print("failed to set sharpness")
+				exit(-1)
+
 
 		if cv2_version == '4.7.0':
 			dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
@@ -71,7 +84,7 @@ class BoardReader:
 	def _getTimeString(self):
 		if self.DEBUG_MODE and not self.debug_path is None:
 			return self.debug_path.split('/')[1]
-		else: 
+		else:
 			return datetime.now().strftime("%Y.%m.%d-%H:%M:%S")
 
 	def __del__(self):
@@ -201,12 +214,15 @@ class BoardReader:
 				piece_centers.append(center)
 			if id > 15:
 				print(f"unexpected ID {id} at coordinates {corners}")
-		imwrite(f"arucos/{self.now}_PIECES.png", self.img)
+		if self.write_steps:
+			imwrite(f"arucos/{self.now}_PIECES.png", self.img)
 		return [filtered_ids, int32(piece_centers)]
 
 	def _generateBoard(self, board_corners, piece_centers):
 		board = zeros(self.board_dimensions, dtype = int8)
 		ids = piece_centers[0]
+		if len(ids) == 0:
+			return board
 		square_size = self.resolution / self.board_dimensions
 		coordinates = int8(piece_centers[1] / square_size)
 
@@ -244,7 +260,7 @@ class BoardReader:
 		''' takes picture and gets chess board matrix from it'''
 		if self.write_steps:
 			self.now = self._getTimeString()
-		
+
 		ids_and_corners = self._getArucoCorners()
 		if len(ids_and_corners) == 0:
 			return None
@@ -252,10 +268,17 @@ class BoardReader:
 		board_corners = self._getBoardCorners(ids_and_corners)
 		if board_corners is None:
 			return None
-		
+
 		ids_and_transformed_corners = self._trasformPerspective(board_corners, ids_and_corners)
 
 		piece_centers = self._getPieceCenters(ids_and_transformed_corners)
 		board = self._generateBoard(board_corners, piece_centers)
 		return board
-		
+
+if __name__ == "__main__":
+	reader = BoardReader()
+	board = reader.getBoard()
+	if board is None:
+		print(":(")
+	else:
+		reader.printBoard(board)
