@@ -1,11 +1,13 @@
 from cv2 import __version__ as cv2_version
-from cv2 import aruco, VideoCapture, cvtColor, COLOR_RGB2GRAY, getPerspectiveTransform, perspectiveTransform # indispensable
-from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_PROP_BUFFERSIZE # camera properties
+from cv2 import aruco, cvtColor, COLOR_RGB2GRAY, getPerspectiveTransform, perspectiveTransform # indispensable
 from cv2 import imwrite, polylines, line, putText, circle, warpPerspective, FONT_HERSHEY_DUPLEX # for debug image printing
 from cv2 import imread # used for tests
 from datetime import datetime # debug image printing
-from numpy import int32, int8, ravel, zeros, array, float32, mean
+from numpy import int32, int8, uint8, ravel, zeros, array, float32, mean, empty
 from os import system # clearing image folder
+
+#from picamera_camera import Camera
+from opencv_camera import Camera
 
 class BoardReader:
 	'''reads images from camera and translates to a chess board matrix with piece positions'''
@@ -33,41 +35,10 @@ class BoardReader:
 		self.DEBUG_MODE = DEBUG_MODE
 		if self.DEBUG_MODE:
 			self.debug_path = None
+		else:
+			self.camera = Camera(resolution)
 
-		if not self.DEBUG_MODE:
-			self.cap = VideoCapture(0)
-
-			ret = self.cap.set(CAP_PROP_FRAME_WIDTH, resolution[0])
-
-			if (ret != True):
-				print("failed to set frame width")
-				exit(-1)
-
-			ret = self.cap.set(CAP_PROP_FRAME_HEIGHT,resolution[1])
-
-			if (ret != True):
-				print("failed to set frame height")
-				exit(-1)
-
-			# default buffer size is 10, meaning we get "very old" images instead of the latest
-			ret = self.cap.set(CAP_PROP_BUFFERSIZE, 1)
-
-			if (ret != True):
-				print("failed to set buffer size")
-				exit(-1)
-
-			ret = self.cap.set(cv2.CAP_PROP_FPS, 1)
-
-			if (ret != True):
-				print("failed to set FPS")
-				exit(-1)
-
-			ret = self.cap.set(cv2.CAP_PROP_SHARPNESS, 100)
-
-			if (ret != True):
-				print("failed to set sharpness")
-				exit(-1)
-
+			self.resolution = self.camera.getRealResolution()
 
 		if cv2_version == '4.7.0':
 			dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
@@ -77,8 +48,8 @@ class BoardReader:
 
 		self.last_position_corners = None
 
+		system("rm arucos/*") # clears aruco image folder so we don't get images we already have through scp command
 		if self.write_steps:
-			system("rm arucos/*") # clears aruco image folder so we don't get images we already have through scp command
 			self.now = self._getTimeString() # gets current time string to use in image names
 
 	def _getTimeString(self):
@@ -87,27 +58,19 @@ class BoardReader:
 		else:
 			return datetime.now().strftime("%Y.%m.%d-%H:%M:%S")
 
-	def __del__(self):
-		# releases camera resource
-		if not self.DEBUG_MODE:
-			self.cap.release()
-
 	def _getArucoCorners(self):
 		'''gets frame from camera and detects aruco codes, returning the coordinates of their corners'''
 		if self.DEBUG_MODE:
 			img = imread(self.debug_path)
 		else:
-			ret, img = self.cap.read()
-			if ret != True:
-				print("failed to read image!")
-				return []
-			print("image read!")
+			time = datetime.now()
+			img = self.camera.capture()
+			print(f"image read in {(datetime.now() - time).total_seconds()} seconds!")
 
 		gray = cvtColor(img, COLOR_RGB2GRAY)
 
 		if self.write_steps:
 			imwrite(f"arucos/{self.now}_RAW.png", img)
-			imwrite(f"arucos/{self.now}_GRAY.png", gray)
 		if cv2_version == '4.7.0':
 			corners, ids, rejectedImgPoints = self.arucoDetector.detectMarkers(gray)
 		else:
@@ -124,7 +87,7 @@ class BoardReader:
 		unravel_corners = []
 		for i in range(len(ids)):
 			unravel_corners.append(corners[i][0])
-	
+
 		return [ids, int32(unravel_corners)]
 
 	def _getBoardCorners(self, ids_and_corners):
@@ -164,7 +127,7 @@ class BoardReader:
 				return None
 
 		self.last_position_corners = corners
-		
+
 		if self.write_steps:
 			self.img = polylines(self.img, int32([corners]), True, (0, 255, 0), 5)
 			imwrite(f"arucos/{self.now}_BORDER.png", self.img)
@@ -175,11 +138,11 @@ class BoardReader:
 		'''applies a perspective transformation to the corner cordinates mapping the corners of the board to the corners of the image'''
 		image_corners = float32([[0, self.resolution[1]],  self.resolution, [self.resolution[0], 0], [0, 0]])
 		matrix = getPerspectiveTransform(float32(board_corners), image_corners)
-		
+
 		if self.write_steps:
 			self.img = warpPerspective(self.img, matrix, self.resolution)
 			inc = self.resolution / self.board_dimensions
-			
+
 			imwrite(f"arucos/{self.now}_TRANSFORM.png", self.img)
 
 			for i in range(1, self.board_dimensions[0]):
@@ -276,7 +239,7 @@ class BoardReader:
 		return board
 
 if __name__ == "__main__":
-	reader = BoardReader()
+	reader = BoardReader(write_steps = True)
 	board = reader.getBoard()
 	if board is None:
 		print(":(")
