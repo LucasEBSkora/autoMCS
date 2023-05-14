@@ -28,11 +28,12 @@ class BoardReader:
 	}
 	'''maps aruco IDs to chess piece and color'''
 
-	def __init__(self, resolution = (1920, 1280), board_dimensions = (12, 8), write_steps = False, DEBUG_MODE = False):
+	def __init__(self, resolution = (1920, 1280), board_dimensions = (12, 8), write_steps = False, DEBUG_MODE = False, print_time = False):
 		self.resolution = int32(resolution)
 		self.board_dimensions = int32(board_dimensions)
 		self.write_steps = write_steps
 		self.DEBUG_MODE = DEBUG_MODE
+		self.print_time = print_time
 		if self.DEBUG_MODE:
 			self.debug_path = None
 		else:
@@ -65,7 +66,8 @@ class BoardReader:
 		else:
 			time = datetime.now()
 			img = self.camera.capture()
-			print(f"image read in {(datetime.now() - time).total_seconds()} seconds!")
+			if self.print_time:
+				print(f"image read in {(datetime.now() - time).total_seconds()} seconds!")
 
 		gray = cvtColor(img, COLOR_RGB2GRAY)
 
@@ -74,7 +76,10 @@ class BoardReader:
 		if cv2_version == '4.7.0':
 			corners, ids, rejectedImgPoints = self.arucoDetector.detectMarkers(gray)
 		else:
+			time = datetime.now()
 			corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.dictionary)
+			if self.print_time:
+				print(f"arucos read in {(datetime.now() - time).total_seconds()} seconds!")
 
 		if ids is None:
 			return []
@@ -228,14 +233,33 @@ class BoardReader:
 		if len(ids_and_corners) == 0:
 			return None
 
+		time = datetime.now()
+
 		board_corners = self._getBoardCorners(ids_and_corners)
+
+		if not self.write_steps and self.print_time:
+			print(f"found corners in {(datetime.now() - time).total_seconds()} seconds!")
+
 		if board_corners is None:
 			return None
 
+		time = datetime.now()
 		ids_and_transformed_corners = self._trasformPerspective(board_corners, ids_and_corners)
 
+		if not self.write_steps and self.print_time:
+			print(f"transformed perspective in {(datetime.now() - time).total_seconds()} seconds!")
+
+		time = datetime.now()
 		piece_centers = self._getPieceCenters(ids_and_transformed_corners)
+		if not self.write_steps and self.print_time:
+			print(f"calculated centers in {(datetime.now() - time).total_seconds()} seconds!")
+
+		time = datetime.now()
 		board = self._generateBoard(board_corners, piece_centers)
+		if not self.write_steps and self.print_time:
+			print(f"generated boards in {(datetime.now() - time).total_seconds()} seconds!")
+			print("--------------------------------------------------------------------------------")
+
 		return board
 
 if __name__ == "__main__":
