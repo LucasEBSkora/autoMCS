@@ -6,8 +6,8 @@ from datetime import datetime # debug image printing
 from numpy import int32, int8, uint8, ravel, zeros, array, float32, mean, empty
 from os import system # clearing image folder
 
-#from picamera_camera import Camera
-from opencv_camera import Camera
+from picamera_camera import Camera
+#from opencv_camera import Camera
 
 class BoardReader:
 	'''reads images from camera and translates to a chess board matrix with piece positions'''
