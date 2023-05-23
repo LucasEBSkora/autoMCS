@@ -6,8 +6,9 @@ from time import sleep
 #resolution = (1280, 960) #almost viable
 #resolution = (1440, 1056) #viable at 7mm
 resolution = (1920, 1088) #viable at 7mm
-#resolution = (1920, 1280) #viable at 7mm
-#resolution = (3280, 2464) #kills the crab
+#resolution = (1920, 1296) #viable at 7mm
+#resolution = (2528, 1808) #sloooooow
+#resolution = (3296, 2464) #kills the crab
 board_dimensions = (12, 8)
 
 reader = BoardReader(resolution, board_dimensions)

@@ -12,7 +12,7 @@ from picamera_camera import Camera
 class BoardReader:
 	'''reads images from camera and translates to a chess board matrix with piece positions'''
 
-	piece_types = { 
+	piece_types = {
 		4: '♟',
 		5: '♜',
 		6: '♞',
@@ -48,6 +48,7 @@ class BoardReader:
 			self.dictionary = aruco.Dictionary_get(aruco.DICT_4X4_50)
 
 		self.last_position_corners = None
+		self.last_board = None
 
 		system("rm arucos/*") # clears aruco image folder so we don't get images we already have through scp command
 		if self.write_steps:
@@ -170,18 +171,25 @@ class BoardReader:
 		'''gets the center of each chess piece identified in the image'''
 		filtered_ids = []
 		piece_centers = []
-		for i in range(len(ids_and_corners[0])):
-			id = ids_and_corners[0][i]
-			corners = ids_and_corners[1][i]
-			if 4 <= id and id <= 15:
-				center = mean(corners, axis=0)
-				if self.write_steps:
-					self.img = putText(self.img, str(id), int32(center), FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 1)
-					self.img = circle(self.img, int32(center), 1, (0, 0, 255), 5)
+		ids = ids_and_corners[0]
+		centers = mean(ids_and_corners[1], axis=1)
+
+		for i in range(len(ids)):
+			id = ids[i]
+			center = centers[i]
+			if id < 4:
+				continue
+
+			if id <= 15:
 				filtered_ids.append(id)
 				piece_centers.append(center)
-			if id > 15:
-				print(f"unexpected ID {id} at coordinates {corners}")
+			else:
+				print(f"unexpected ID {id} at coordinates {center}")
+
+			if self.write_steps:
+				self.img = putText(self.img, str(id), int32(center), FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 1)
+				self.img = circle(self.img, int32(center), 1, (0, 0, 255), 5)
+
 		if self.write_steps:
 			imwrite(f"arucos/{self.now}_PIECES.png", self.img)
 		return [filtered_ids, int32(piece_centers)]
@@ -200,11 +208,55 @@ class BoardReader:
 			if coord[0] > self.board_dimensions[0] or coord[1] > self.board_dimensions[1]:
 				print(f"piece {BoardReader.piece_types[id]} at coordinates {tuple(coord)} out of board with dimensions {tuple(coord)}")
 			elif board[coord[0]][coord[1]] != 0:
-				print(f"position {coord} has pieces {board[coord[0]][coord[1]]} and {BoardReader.piece_types[id]}!")
-				board[coord[0]][coord[1]] *= 100
-				board[coord[0]][coord[1]] += id
+				if board[coord[0]][coord[1]] == id:
+					print(f"position {coord} has two pieces of type {BoardReader.piece_types[id]}! - treating piece as duplicate")
+				else:
+					print(f"position {coord} has pieces {BoardReader.piece_types[board[coord[0]][coord[1]]]} and {BoardReader.piece_types[id]}!")
+					board[coord[0]][coord[1]] *= 100
+					board[coord[0]][coord[1]] += id
 			else:
 				board[coord[0]][coord[1]] = id
+		if not self.last_board is None:
+			board = self._verifyBoard(board, self.last_board)
+		self.last_board = board
+		return board
+
+	def _verifyBoard(self, board, last_board):
+		if board.shape != last_board.shape:
+			return board
+		pieces_not_in_last_position = []
+		pieces_in_new_position = []
+
+		for i in range(board.shape[0]):
+			for j in range(board.shape[1]):
+				last_piece_id = last_board[i][j]
+				new_piece_id = board[i][j]
+				if last_piece_id == 0 and new_piece_id > 0:
+					pieces_in_new_position.append((new_piece_id, (i, j)))
+				elif  last_piece_id > 0 and new_piece_id == 0:
+					pieces_not_in_last_position.append((last_piece_id, (i, j)))
+				elif  last_piece_id != new_piece_id:
+					pieces_in_new_position.append((last_piece_id, (i, j)))
+					pieces_not_in_last_position.append((new_piece_id, (i, j)))
+
+		pieces_moved = []
+		for new_piece in pieces_in_new_position:
+			for old_piece in pieces_not_in_last_position:
+				if new_piece[0] == old_piece[0]:
+					pieces_moved.append((new_piece[0], old_piece[1], new_piece[1]))
+					pieces_in_new_position.remove(new_piece)
+					pieces_not_in_last_position.remove(old_piece)
+
+		if len(pieces_moved) > 2:
+			print("too many moved pieces!")
+			for movement in pieces_moved:
+				print(f"chess piece {BoardReader.piece_types[movement[0]]} moved from {movement[0]} to {movement[1]}")
+
+		# assumes pieces that we "lost" are in the same place, if there are not other pieces there
+		for piece in pieces_not_in_last_position:
+			if board[piece[1][0]][piece[1][1]] == 0:
+				board[piece[1][0]][piece[1][1]] = piece[0]
+
 		return board
 
 	def printBoard(self, board):
