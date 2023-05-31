@@ -3,8 +3,9 @@ from cv2 import aruco, cvtColor, COLOR_RGB2GRAY, getPerspectiveTransform, perspe
 from cv2 import imwrite, polylines, line, putText, circle, warpPerspective, FONT_HERSHEY_DUPLEX # for debug image printing
 from cv2 import imread # used for tests
 from datetime import datetime # debug image printing
-from numpy import int32, int8, uint8, ravel, zeros, array, float32, mean, empty
+from numpy import int32, int8, ravel, zeros, float32, mean
 from os import system # clearing image folder
+from uci_string_generator import UCIStringGenerator
 
 from picamera_camera import Camera
 #from opencv_camera import Camera
@@ -34,6 +35,7 @@ class BoardReader:
 		self.write_steps = write_steps
 		self.DEBUG_MODE = DEBUG_MODE
 		self.print_time = print_time
+		self.UCI_generator = UCIStringGenerator()
 
 		if self.DEBUG_MODE:
 			self.debug_path = None
@@ -242,6 +244,7 @@ class BoardReader:
 
 	def _generateBoard(self, piece_centers):
 		board = zeros(self.board_dimensions, dtype = int8)
+		real_positions = zeros((self.board_dimensions[0], self.board_dimensions[1], 2), dtype = int32)
 		ids = piece_centers[0]
 		if len(ids) == 0:
 			return board
@@ -250,6 +253,7 @@ class BoardReader:
 		for i in range(len(ids)):
 			id = ids[i]
 			coord = coordinates[i]
+			center = piece_centers[1][i]
 			if self._isPieceOutOfBoard(coord):
 				print(f"piece {BoardReader.piece_types[id]} at coordinates {tuple(coord)} out of board with dimensions {tuple(coord)}")
 				continue
@@ -262,7 +266,8 @@ class BoardReader:
 					board[coord[0]][coord[1]] += id
 				continue
 			board[coord[0]][coord[1]] = id
-		return board
+			real_positions[coord[0]][coord[1]] = center
+		return board, real_positions
 
 	def _isNewPieceInPosition(self, last_id, new_id):
 		return last_id == 0 and new_id > 0
@@ -308,7 +313,7 @@ class BoardReader:
 
 		return pieces_moved, pieces_in_new_position, pieces_not_in_last_position
 
-	def _verifyBoard(self, board, last_board):
+	def _verifyBoardAndSearchPossibleMovements(self, board, last_board):
 		if board.shape != last_board.shape:
 			return board
 		
@@ -323,7 +328,7 @@ class BoardReader:
 
 		# assumes pieces that we "lost" are in the same place, if there are not other pieces there
 		board = self._restoreMissingPieces(board, pieces_not_in_last_position)
-		return board
+		return board, pieces_moved
 
 	def printBoard(self, board):
 		'''pretty prints the chess board matrix'''
@@ -342,7 +347,7 @@ class BoardReader:
 					line += '?'
 			print(line)
 
-	def getBoard(self):
+	def getBoardRealPositionsAndPossibleMoves(self):
 		''' takes picture and gets chess board matrix from it'''
 		if self.write_steps:
 			self.now = self._getTimeString()
@@ -373,16 +378,20 @@ class BoardReader:
 			print(f"calculated centers in {(datetime.now() - time).total_seconds()} seconds!")
 
 		time = datetime.now()
-		board = self._generateBoard(piece_centers)
+		board, real_positions = self._generateBoard(piece_centers)
 		if not self.write_steps and self.print_time:
 			print(f"generated boards in {(datetime.now() - time).total_seconds()} seconds!")
 			print("--------------------------------------------------------------------------------")
 
+		possible_moves = None
+
 		if not self.last_board is None:
-			board = self._verifyBoard(board, self.last_board)
+			board, possible_moves = self._verifyBoard(board, self.last_board)
 		self.last_board = board
 
-		return board
+		possible_moves_uci = self.UCI_generator.getUCIPossibleMove(board, possible_moves)
+
+		return board, real_positions, possible_moves
 
 if __name__ == "__main__":
 	reader = BoardReader(write_steps = True)
