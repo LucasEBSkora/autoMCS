@@ -7,7 +7,7 @@ from numpy import int32, int8, ravel, zeros, float32, mean, flip
 from os import system # clearing image folder
 from uci_string_generator import UCIStringGenerator
 
-from picamera_camera import Camera
+#from picamera_camera import Camera
 #from opencv_camera import Camera
 
 class BoardReader:
@@ -320,6 +320,7 @@ class BoardReader:
 					del pieces_not_in_last_position[j]
 					len_new_pieces -= 1
 					len_not_in_last_position_pieces -= 1
+					found = True
 					break
 			if not found:
 				i += 1
@@ -331,15 +332,7 @@ class BoardReader:
 			return board
 
 		pieces_not_in_last_position, pieces_in_new_position = self._calculateDifferencesBetweenBoards(last_board, board)
-		print(f"pieces not in last position: {pieces_not_in_last_position}")
-		print(f"pieces in new position: {pieces_in_new_position}")
-
 		pieces_moved, pieces_not_in_last_position, pieces_in_new_position = self._searchPossibleMovements(pieces_in_new_position, pieces_not_in_last_position)
-
-		print(f"pieces moved: {pieces_moved}")
-		print(f"pieces not in last position: {pieces_not_in_last_position}")
-		print(f"pieces in new position: {pieces_in_new_position}")
-
 
 		if len(pieces_moved) > 2:
 			print("too many moved pieces!")
