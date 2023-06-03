@@ -74,8 +74,7 @@ class UCIStringGenerator:
 		return possible_moves_uci
 
 	def _convertPossibleMoves(self, moves):
-		uci_moves = []
-		# uci_moves.append(self._convertPossibleTwoPieceMoves(moves))
+		uci_moves = self._convertPossibleTwoPieceMoves(moves)
 		uci_moves += self._convertPossibleOnePieceMoves(moves)
 		return uci_moves
 
@@ -108,12 +107,20 @@ class UCIStringGenerator:
 	def _convertPossibleTwoPieceMoves(self, moves):
 		two_piece_moves = []
 		n_moves = len(moves)
-		for i in range(n_moves):
+		if n_moves < 2:
+			return []
+		i = 0
+		while i < n_moves:
 			move_i = moves[i]
 			if self._movementHappenedOutOfBoard(move_i):
+				i += 1
 				continue
+				
+			j = i + 1
 
-			for j in range(i, n_moves):
+			found_move_with_piece = False
+			
+			while j < n_moves:
 				move_j = moves[j]
 				if self._movementHappenedOutOfBoard(move_j):
 					continue
@@ -121,8 +128,16 @@ class UCIStringGenerator:
 				two_piece_move = self._tryCreateTwoPieceMove(move_i, move_j)
 				if not two_piece_move is None:
 					two_piece_moves.append(two_piece_move)
-
-			return two_piece_moves
+					moves.remove(move_i)
+					moves.remove(move_j)
+					n_moves -= 2
+					found_move_with_piece = True
+					break
+			
+			if not found_move_with_piece:
+				i += 1
+		
+		return two_piece_moves
 
 	def _tryCreateTwoPieceMove(self, first, second):
 		capture = self._tryCreateCaptureMove(first, second)
@@ -155,18 +170,6 @@ class UCIStringGenerator:
 
 		return self._generateUCIFromMove(capturing[1], capturing[2])
 
-	def _piecesAreOfSameColor(self, first_piece_id, second_piece_id):
-		if self._pieceIsWhite(first_piece_id):
-			return self._pieceIsWhite(second_piece_id)
-		else:
-			return self._pieceIsBlack(second_piece_id)
-
-	def _pieceIsWhite(self, id):
-		return 4 <= id and id <= 9
-
-	def _pieceIsBlack(self, id):
-		return 10 <= id and id <= 15
-
 	# A capture involves one pawn moving from board to graveyard and another piece of the same color (that isn't a king or pawn) moving to the
 	# last rank and to the same file as the original pawn
 	def _tryCreatePromotionMove(self, first, second):
@@ -188,6 +191,67 @@ class UCIStringGenerator:
 		promotion_type = self._getChessModulePieceType(promoted[0])
 
 		return self._generateUCIFromMove(pawn[1], promoted[2], promotion_type)
+	
+		# A castling move involves one king and rook of the same color moving along the same rank
+	# last rank and to the same file as the original pawn
+	def _tryCreateCastlingMove(self, first, second):
+		if not self._piecesAreOfSameColor(first[0], second[0]):
+			return None
+
+		king = None
+		rook = None
+
+		if self._isKing(first) and self._isRook(second):
+			pawn = first
+			promoted = second
+		elif self._isKing(second) and self._isRook(first):
+			king = second
+			rook = first
+		else:
+			return None
+		
+		if not self._moveIsCastling(king, rook):
+			return None
+		
+		return self._generateUCIFromMove(king, rook)
+
+	def _moveIsCastling(self, king, rook):
+		if not self._areKingAndRookInCorrectRankForCastling(king, rook):
+			return False 
+
+		if not self._kingInStartingFile(king):
+			return False
+
+		return self._isKingSideCastling(king, rook) or self._isQueenSideCastling(king, rook)
+
+	def _areKingAndRookInCorrectRankForCastling(self, king, rook):
+		if self._pieceIsWhite(king):
+			expected_rank = 0
+		else: 
+			expected_rank = 7
+
+		return king[1][0] == expected_rank and king[2][0] == expected_rank and rook[1][0] == expected_rank and rook[2][0] == expected_rank
+		
+	def _kingInStartingFile(self, king):
+		return king[1][1] == 6
+	
+	def _isKingSideCastling(self, king, rook):
+		return rook[1][1] == 9 and rook[2][1] == 7 and king[2][2] == 8
+	
+	def _isQueenSideCastling(self, king, rook):
+		return rook[1][1] == 2 and rook[2][1] == 5 and king[2][2] == 4
+
+	def _piecesAreOfSameColor(self, first_piece_id, second_piece_id):
+		if self._pieceIsWhite(first_piece_id):
+			return self._pieceIsWhite(second_piece_id)
+		else:
+			return self._pieceIsBlack(second_piece_id)
+
+	def _pieceIsWhite(self, id):
+		return 4 <= id and id <= 9
+
+	def _pieceIsBlack(self, id):
+		return 10 <= id and id <= 15
 
 	def _isPawn(self, move):
 		id = move[0]
@@ -196,6 +260,10 @@ class UCIStringGenerator:
 	def _isKing(self, move):
 		id = move[0]
 		return id == 8 or id == 14
+	
+	def _isRook(self, move):
+		id = move[0]
+		return id == 5 or id == 11
 
 	def _isValidPromotionPieceType(self, move):
 		return not (self._isPawn(move) or self._isKing(move))
