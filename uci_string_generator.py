@@ -115,7 +115,7 @@ class UCIStringGenerator:
 			if self._movementHappenedOutOfBoard(move_i):
 				i += 1
 				continue
-				
+
 			j = i + 1
 
 			found_move_with_piece = False
@@ -133,7 +133,8 @@ class UCIStringGenerator:
 					n_moves -= 2
 					found_move_with_piece = True
 					break
-			
+				j += 1
+
 			if not found_move_with_piece:
 				i += 1
 		
@@ -151,6 +152,8 @@ class UCIStringGenerator:
 		castling = self._tryCreateCastlingMove(first, second)
 		if not castling is None:
 			return castling
+
+		return None
 
 	# A capture involves one piece moving to the position of another, which is of the opposite color and moves to out of board
 	# en passants are handled as one piece moves.
@@ -191,8 +194,8 @@ class UCIStringGenerator:
 		promotion_type = self._getChessModulePieceType(promoted[0])
 
 		return self._generateUCIFromMove(pawn[1], promoted[2], promotion_type)
-	
-		# A castling move involves one king and rook of the same color moving along the same rank
+
+	# A castling move involves one king and rook of the same color moving along the same rank
 	# last rank and to the same file as the original pawn
 	def _tryCreateCastlingMove(self, first, second):
 		if not self._piecesAreOfSameColor(first[0], second[0]):
@@ -202,22 +205,22 @@ class UCIStringGenerator:
 		rook = None
 
 		if self._isKing(first) and self._isRook(second):
-			pawn = first
-			promoted = second
+			king = first
+			rook = second
 		elif self._isKing(second) and self._isRook(first):
 			king = second
 			rook = first
 		else:
 			return None
-		
+
 		if not self._moveIsCastling(king, rook):
 			return None
-		
-		return self._generateUCIFromMove(king, rook)
+
+		return self._generateUCIFromMove(king[1], king[2])
 
 	def _moveIsCastling(self, king, rook):
 		if not self._areKingAndRookInCorrectRankForCastling(king, rook):
-			return False 
+			return False
 
 		if not self._kingInStartingFile(king):
 			return False
@@ -225,21 +228,21 @@ class UCIStringGenerator:
 		return self._isKingSideCastling(king, rook) or self._isQueenSideCastling(king, rook)
 
 	def _areKingAndRookInCorrectRankForCastling(self, king, rook):
-		if self._pieceIsWhite(king):
+		if self._pieceIsWhite(king[0]):
 			expected_rank = 0
-		else: 
+		else:
 			expected_rank = 7
 
 		return king[1][0] == expected_rank and king[2][0] == expected_rank and rook[1][0] == expected_rank and rook[2][0] == expected_rank
-		
+
 	def _kingInStartingFile(self, king):
 		return king[1][1] == 6
-	
+
 	def _isKingSideCastling(self, king, rook):
-		return rook[1][1] == 9 and rook[2][1] == 7 and king[2][2] == 8
-	
+		return rook[1][1] == 9 and rook[2][1] == 7 and king[2][1] == 8
+
 	def _isQueenSideCastling(self, king, rook):
-		return rook[1][1] == 2 and rook[2][1] == 5 and king[2][2] == 4
+		return rook[1][1] == 2 and rook[2][1] == 5 and king[2][1] == 4
 
 	def _piecesAreOfSameColor(self, first_piece_id, second_piece_id):
 		if self._pieceIsWhite(first_piece_id):
