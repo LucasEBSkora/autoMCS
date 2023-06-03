@@ -3,7 +3,7 @@ from cv2 import aruco, cvtColor, COLOR_RGB2GRAY, getPerspectiveTransform, perspe
 from cv2 import imwrite, polylines, line, putText, circle, warpPerspective, FONT_HERSHEY_DUPLEX # for debug image printing
 from cv2 import imread # used for tests
 from datetime import datetime # debug image printing
-from numpy import int32, int8, ravel, zeros, float32, mean
+from numpy import int32, int8, ravel, zeros, float32, mean, flip
 from os import system # clearing image folder
 from uci_string_generator import UCIStringGenerator
 
@@ -29,7 +29,7 @@ class BoardReader:
 	}
 	'''maps aruco IDs to chess piece and color'''
 
-	def __init__(self, resolution = (1920, 1280), board_dimensions = (12, 8), write_steps = False, DEBUG_MODE = False, print_time = False):
+	def __init__(self, resolution = (1920, 1280), board_dimensions = (8, 12), write_steps = False, DEBUG_MODE = False, print_time = False):
 		self.resolution = int32(resolution)
 		self.board_dimensions = int32(board_dimensions)
 		self.write_steps = write_steps
@@ -163,7 +163,7 @@ class BoardReader:
 		return float32([[0, self.resolution[1]],  self.resolution, [self.resolution[0], 0], [0, 0]])
 	
 	def _getBoardSquareDimensions(self):
-		return self.resolution / self.board_dimensions
+		return self.resolution / flip(self.board_dimensions)
 	
 	def _drawNthVerticalLine(self, distance_between_lines, n):
 		first_point = tuple(int32([n*distance_between_lines, self.resolution[1]]))
@@ -187,10 +187,10 @@ class BoardReader:
 			imwrite(f"arucos/{self.now}_TRANSFORM.png", self.img)
 
 			for i in range(1, self.board_dimensions[0]):
-				self._drawNthVerticalLine(vertical_distance_between_lines, i)
+				self._drawNthHorizontalLine(horizontal_distance_between_lines, i)
 
 			for i in range(1, self.board_dimensions[1]):
-				self._drawNthHorizontalLine(horizontal_distance_between_lines, i)
+				self._drawNthVerticalLine(vertical_distance_between_lines, i)
 
 			imwrite(f"arucos/{self.now}_BOARD.png", self.img)
 
@@ -233,10 +233,8 @@ class BoardReader:
 		return [filtered_ids, int32(piece_centers)]
 
 	def _calculatePieceCoordinates(self, centers):
-		square_size = self.resolution / self.board_dimensions
-		coordinates = int8(centers / square_size)
-		coordinates += int8([0, 1 - self.board_dimensions[1]])
-		coordinates *= int8([1, -1])
+		square_size = self._getBoardSquareDimensions()
+		coordinates = flip(int8(centers / square_size), axis=1)
 		return coordinates
 
 	def _isPieceOutOfBoard(self, piece_position):
@@ -276,7 +274,7 @@ class BoardReader:
 		return last_id > 0 and new_id == 0
 	
 	def _isDifferentPieceInPosition(self, last_id, new_id):
-		return last_id == new_id
+		return last_id != new_id
 
 	def _calculateDifferencesBetweenBoards(self, last_board, new_board):
 		pieces_not_in_last_position = []
@@ -286,13 +284,13 @@ class BoardReader:
 			for j in range(new_board.shape[1]):
 				last_piece_id = last_board[i][j]
 				new_piece_id = new_board[i][j]
-				if self._isDifferentPieceInPosition(new_piece_id, last_piece_id):
+				if self._isNewPieceInPosition(last_piece_id, new_piece_id):
 					pieces_in_new_position.append((new_piece_id, (i, j)))
-				elif self._isPieceNoLongerInPosition(new_piece_id, last_piece_id):
+				elif self._isPieceNoLongerInPosition(last_piece_id, new_piece_id):
 					pieces_not_in_last_position.append((last_piece_id, (i, j)))
-				elif self._isDifferentPieceInPosition(new_piece_id, last_piece_id):
-					pieces_in_new_position.append((last_piece_id, (i, j)))
-					pieces_not_in_last_position.append((new_piece_id, (i, j)))
+				elif self._isDifferentPieceInPosition(last_piece_id, new_piece_id):
+					pieces_in_new_position.append((new_piece_id, (i, j)))
+					pieces_not_in_last_position.append((last_piece_id, (i, j)))
 		
 		return pieces_not_in_last_position, pieces_in_new_position
 
@@ -316,11 +314,8 @@ class BoardReader:
 	def _verifyBoardAndSearchPossibleMovements(self, board, last_board):
 		if board.shape != last_board.shape:
 			return board
-		
 		pieces_not_in_last_position, pieces_in_new_position = self._calculateDifferencesBetweenBoards(last_board, board)
-
 		pieces_moved, pieces_not_in_last_position, pieces_in_new_position = self._searchPossibleMovements(pieces_in_new_position, pieces_not_in_last_position)
-
 		if len(pieces_moved) > 2:
 			print("too many moved pieces!")
 			for id, old_position, new_position in pieces_moved:
@@ -329,13 +324,12 @@ class BoardReader:
 		# assumes pieces that we "lost" are in the same place, if there are not other pieces there
 		board = self._restoreMissingPieces(board, pieces_not_in_last_position)
 		return board, pieces_moved
-
 	def printBoard(self, board):
 		'''pretty prints the chess board matrix'''
-		for i in range(board.shape[1] - 1, -1, -1):
+		for i in range(board.shape[0]):
 			line = ""
-			for j in range(board.shape[0]):
-				value = board[j][i]
+			for j in range(board.shape[1]):
+				value = board[i][j]
 				if value == 0:
 					if (i + j ) % 2 == 0:
 						line += '□'
@@ -354,7 +348,7 @@ class BoardReader:
 
 		ids_and_corners = self._getArucoCorners()
 		if len(ids_and_corners) == 0:
-			return None
+			return None, None, None
 
 		time = datetime.now()
 
@@ -364,7 +358,7 @@ class BoardReader:
 			print(f"found corners in {(datetime.now() - time).total_seconds()} seconds!")
 
 		if board_corners is None:
-			return None
+			return None, None, None
 
 		time = datetime.now()
 		ids_and_transformed_corners = self._trasformPerspective(board_corners, ids_and_corners)
@@ -386,16 +380,15 @@ class BoardReader:
 		possible_moves = None
 
 		if not self.last_board is None:
-			board, possible_moves = self._verifyBoard(board, self.last_board)
+			board, possible_moves = self._verifyBoardAndSearchPossibleMovements(board, self.last_board)
+			possible_moves = self.UCI_generator.getUCIPossibleMove(board, possible_moves)
 		self.last_board = board
-
-		possible_moves_uci = self.UCI_generator.getUCIPossibleMove(board, possible_moves)
 
 		return board, real_positions, possible_moves
 
 if __name__ == "__main__":
 	reader = BoardReader(write_steps = True)
-	board = reader.getBoard()
+	board, _, _ = reader.getBoardRealPositionsAndPossibleMoves()
 	if board is None:
 		print(":(")
 	else:

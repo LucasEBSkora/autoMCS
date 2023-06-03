@@ -3,7 +3,6 @@ from numpy import int8
 
 
 class UCIStringGenerator:
-            
 	piece_types = {
 		4: chess.PAWN,
 		5: chess.ROOK,
@@ -20,15 +19,15 @@ class UCIStringGenerator:
   }
 
 	def __init__(self, initial_board=None):
-		if type(initial_board) != chess.Board:
+		if (not initial_board is None) and  type(initial_board) != chess.Board:
 			initial_board = self._convertToChessModuleBoard(initial_board)
 		self.last_board = initial_board
 
 	def getUCIPossibleMove(self, current_board, possible_moves):
+		if possible_moves is None or len(possible_moves) == 0:
+			return []
 		self.current_board = self._convertToChessModuleBoard(current_board)
-
 		possible_moves = self._convertPossibleMoves(possible_moves)
-
 		if not self.last_board is None:
 			possible_moves = self._filterMoveConvertLastToCurrentBoard(possible_moves)
 		self.last_board = self.current_board
@@ -37,25 +36,34 @@ class UCIStringGenerator:
 
 		return possible_moves_uci
 
+	def _getChessPieceChar(self, id):
+		char = chess.piece_symbol(self._getChessModulePieceType(id))
+
+		if self._pieceIsBlack(id):
+			char = char.upper()
+		return char
+
 	def _convertToChessModuleBoard(self, board):
 		board_fen = ""
-		for rank in range(0, 8):
+		for rank in range(board.shape[0]):
 			consecutive_empty_positions = 0
-			for file in range(2, 10):
-				if board[rank][file] == 0:
+			for file in range(2, board.shape[1] - 2):
+				id = board[rank][file]
+				if id == 0:
 					consecutive_empty_positions += 1
+					continue
 				elif consecutive_empty_positions > 0:
 					board_fen += str(consecutive_empty_positions)
 					consecutive_empty_positions = 0
 
-				board_fen += chess.piece_symbol(self._getChessModulePieceType(board[rank][file]))
+				board_fen += self._getChessPieceChar(id)
 			if consecutive_empty_positions > 0:
 					board_fen += str(consecutive_empty_positions)
 			if rank < 7:
 				board_fen += "/"
 
 		return chess.Board(board_fen)
-				
+
 	def _filterMoveConvertLastToCurrentBoard(self, board, moves):
 		return moves
 
@@ -67,8 +75,8 @@ class UCIStringGenerator:
 
 	def _convertPossibleMoves(self, moves):
 		uci_moves = []
-		uci_moves.append(self._convertPossibleTwoPieceMoves(moves))
-		uci_moves.append(self._convertPossibleOnePieceMoves(moves))
+		# uci_moves.append(self._convertPossibleTwoPieceMoves(moves))
+		uci_moves += self._convertPossibleOnePieceMoves(moves)
 		return uci_moves
 
 	# One piece moves are moves that can be described by one piece only, that is, en passants and simple movements without promotions,
@@ -86,8 +94,8 @@ class UCIStringGenerator:
 		return self._coordinatesOutOfBoard(move[1]) or self._coordinatesOutOfBoard(move[2])
 
 	def _generateUCIFromMove(self, origin, destination, promotion_type=None):
-		origin = self.__getSquare(origin)
-		destination = self.__getSquare(destination)
+		origin = self._getSquare(origin)
+		destination = self._getSquare(destination)
 		move = chess.Move(origin, destination, promotion=promotion_type)
 		# try:
 		# 	move = self.current_board.find_move(origin, destination, promotion=promotion_type)
@@ -201,13 +209,13 @@ class UCIStringGenerator:
 	def _coordinatesOutOfBoard(self, coordinates):
 		(rank, file) = coordinates
 		# graveyard files are out of board
-		return 0 > rank or rank <= 8 or 2 > file or 10 <= file
+		return (not rank in range(0, 8)) or (not file in range(2, 10))
 
 	def _getSquare(self, coordinates):
-		return chess.Square(self._getSquareName(coordinates))
+		return chess.parse_square(self._getSquareName(coordinates))
 
 	ascii_a = ord('a')
 
 	def _getSquareName(self, coordinates):
 		(rank, file) = coordinates
-		return chr(UCIStringGenerator.ascii_a + file) + str(rank)
+		return chr(UCIStringGenerator.ascii_a + file - 2) + str(rank)

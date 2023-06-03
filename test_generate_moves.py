@@ -1,17 +1,17 @@
 from board_reader import BoardReader
-from time import sleep
 from os import listdir
 from os.path import isfile, join
 
-test_file_path = "test_images_find_corners"
+test_file_path = "test_generate_moves"
 test_files = sorted([test_file_path + '/' + f for f in listdir(test_file_path) if isfile(join(test_file_path, f))])
 
-resolution = (1920, 1080) 
+resolution = (1920, 1088) 
 board_dimensions = (8, 12)
 
-reader = BoardReader(resolution, board_dimensions, True, True)
+reader = BoardReader(resolution, board_dimensions, DEBUG_MODE= True, write_steps=True)
 
 for image in test_files:
-  print(image)
   reader.debug_path = image
-  board = reader.getBoard()
+  board, real_positions, possible_moves = reader.getBoardRealPositionsAndPossibleMoves()
+  reader.printBoard(board)
+  print(possible_moves)
