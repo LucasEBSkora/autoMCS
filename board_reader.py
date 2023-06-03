@@ -66,7 +66,7 @@ class BoardReader:
 	# for some reason detectMarkers returns a tuple of n arrays of dimension (1, 4, 2) when an (n, 4, 2) array is a lot more useful
 	def _formatArucoCornerArray(self, corners):
 		return int32(corners).reshape((len(corners), 4, 2))
-	
+
 	def _detectArucos(self, img):
 		if cv2_version == '4.7.0':
 			corners, ids, _ = self.arucoDetector.detectMarkers(img)
@@ -89,7 +89,7 @@ class BoardReader:
 		if self.write_steps:
 			imwrite(f"arucos/{self.now}_RAW.png", img)
 		time = datetime.now()
-		corners, ids = self._detectArucos(gray)		
+		corners, ids = self._detectArucos(gray)
 		if self.print_time:
 			print(f"arucos read in {(datetime.now() - time).total_seconds()} seconds!")
 
@@ -119,7 +119,8 @@ class BoardReader:
 		for i in range(0, 4):
 			if found_corner[i] == 0:
 				corners[i] = self.last_position_corners[i]
-	
+		return corners
+
 	def _printImageWithBoardCorners(self, corners):
 		self.img = polylines(self.img, int32([corners]), True, (0, 255, 0), 5)
 		imwrite(f"arucos/{self.now}_BORDER.png", self.img)
@@ -141,7 +142,7 @@ class BoardReader:
 				found_corner[id] += 1
 				corners[id] = ids_and_corners[1][i][0]
 
-		found_all_corners = self._checkFoundAllCorners(found_corner)			
+		found_all_corners = self._checkFoundAllCorners(found_corner)
 
 		if not found_all_corners:
 			self._showCornerNotFoundMessage(found_corner)
@@ -149,8 +150,9 @@ class BoardReader:
 			if self.last_position_corners is None:
 				print("can't find all points!")
 				return None
-			
-			corners = self._restoreLastFoundCorners(found_corner, corners)				
+
+			print(f"restoring missing corners from {self.last_position_corners}")
+			corners = self._restoreLastFoundCorners(found_corner, corners)
 
 		self.last_position_corners = corners
 
@@ -158,13 +160,13 @@ class BoardReader:
 			self._printImageWithBoardCorners(corners)
 
 		return corners
-	
+
 	def	_getImageCorners(self):
 		return float32([[0, self.resolution[1]],  self.resolution, [self.resolution[0], 0], [0, 0]])
-	
+
 	def _getBoardSquareDimensions(self):
 		return self.resolution / flip(self.board_dimensions)
-	
+
 	def _drawNthVerticalLine(self, distance_between_lines, n):
 		first_point = tuple(int32([n*distance_between_lines, self.resolution[1]]))
 		second_point = tuple(int32([n*distance_between_lines, 0]))
@@ -174,10 +176,10 @@ class BoardReader:
 		first_point = tuple(int32([self.resolution[0], n*distance_between_lines]))
 		second_point = tuple(int32([0, n*distance_between_lines]))
 		line(self.img, first_point, second_point, (255, 0, 0), 5)
-	
+
 	def _trasformPerspective(self, board_corners, ids_and_corners):
 		'''applies a perspective transformation to the corner cordinates mapping the corners of the board to the corners of the image'''
-		image_corners = self._getImageCorners() 
+		image_corners = self._getImageCorners()
 		matrix = getPerspectiveTransform(float32(board_corners), image_corners)
 
 		if self.write_steps:
@@ -200,12 +202,12 @@ class BoardReader:
 
 	def _drawArucoCenterAndWriteID(self, id, center):
 		color = (0, 0, 255)
-		
+
 		id = str(id)
 		center = int32(center)
 		self.img = putText(self.img, id, center, FONT_HERSHEY_DUPLEX, 1, color, 1)
 		self.img = circle(self.img, center, 1, color, 5)
-	
+
 	def _getPieceCenters(self, ids_and_corners):
 		'''gets the center of each chess piece identified in the image'''
 		filtered_ids = []
@@ -265,14 +267,15 @@ class BoardReader:
 				continue
 			board[coord[0]][coord[1]] = id
 			real_positions[coord[0]][coord[1]] = center
+		board = flip(board, axis=0)
 		return board, real_positions
 
 	def _isNewPieceInPosition(self, last_id, new_id):
 		return last_id == 0 and new_id > 0
-	
+
 	def _isPieceNoLongerInPosition(self, last_id, new_id):
 		return last_id > 0 and new_id == 0
-	
+
 	def _isDifferentPieceInPosition(self, last_id, new_id):
 		return last_id != new_id
 
@@ -291,7 +294,7 @@ class BoardReader:
 				elif self._isDifferentPieceInPosition(last_piece_id, new_piece_id):
 					pieces_in_new_position.append((new_piece_id, (i, j)))
 					pieces_not_in_last_position.append((last_piece_id, (i, j)))
-		
+
 		return pieces_not_in_last_position, pieces_in_new_position
 
 	def _restoreMissingPieces(self, board, missing_pieces):
@@ -326,7 +329,7 @@ class BoardReader:
 		return board, pieces_moved
 	def printBoard(self, board):
 		'''pretty prints the chess board matrix'''
-		for i in range(board.shape[0]):
+		for i in range(board.shape[0] - 1, -1, -1):
 			line = ""
 			for j in range(board.shape[1]):
 				value = board[i][j]

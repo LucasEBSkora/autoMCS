@@ -11,7 +11,7 @@ resolution = (1920, 1088) #viable at 7mm
 #resolution = (3296, 2464) #kills the crab
 board_dimensions = (8, 12)
 
-reader = BoardReader(resolution, board_dimensions, write_steps = True)
+reader = BoardReader(resolution, board_dimensions, write_steps = False)
 
 finish_game = ""
 

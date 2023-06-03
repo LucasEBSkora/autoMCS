@@ -29,7 +29,7 @@ class UCIStringGenerator:
 		self.current_board = self._convertToChessModuleBoard(current_board)
 		possible_moves = self._convertPossibleMoves(possible_moves)
 		if not self.last_board is None:
-			possible_moves = self._filterMoveConvertLastToCurrentBoard(possible_moves)
+			possible_moves = self._filterMoveConvertLastToCurrentBoard(current_board, possible_moves)
 		self.last_board = self.current_board
 
 		possible_moves_uci = self._convertMovesToUCI(possible_moves)
@@ -218,4 +218,4 @@ class UCIStringGenerator:
 
 	def _getSquareName(self, coordinates):
 		(rank, file) = coordinates
-		return chr(UCIStringGenerator.ascii_a + file - 2) + str(rank)
+		return chr(UCIStringGenerator.ascii_a + file - 2) + str(rank + 1)
