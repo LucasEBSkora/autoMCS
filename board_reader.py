@@ -247,7 +247,7 @@ class BoardReader:
 		real_positions = zeros((self.board_dimensions[0], self.board_dimensions[1], 2), dtype = int32)
 		ids = piece_centers[0]
 		if len(ids) == 0:
-			return board
+			return board, real_positions
 		coordinates = self._calculatePieceCoordinates(piece_centers[1])
 
 		for i in range(len(ids)):
@@ -305,26 +305,49 @@ class BoardReader:
 
 	def _searchPossibleMovements(self, pieces_in_new_position, pieces_not_in_last_position):
 		pieces_moved = []
-		for new_piece in pieces_in_new_position:
-			for old_piece in pieces_not_in_last_position:
+		len_new_pieces = len(pieces_in_new_position)
+		len_not_in_last_position_pieces = len(pieces_not_in_last_position)
+		i = 0
+		while i < len_new_pieces:
+			j = i
+			new_piece = pieces_in_new_position[i]
+			found = False
+			while j < len_not_in_last_position_pieces:
+				old_piece = pieces_not_in_last_position[j]
 				if new_piece[0] == old_piece[0]:
 					pieces_moved.append((new_piece[0], old_piece[1], new_piece[1]))
-					pieces_in_new_position.remove(new_piece)
-					pieces_not_in_last_position.remove(old_piece)
+					del pieces_in_new_position[i]
+					del pieces_not_in_last_position[j]
+					len_new_pieces -= 1
+					len_not_in_last_position_pieces -= 1
+					break
+			if not found:
+				i += 1
 
-		return pieces_moved, pieces_in_new_position, pieces_not_in_last_position
+		return pieces_moved, pieces_not_in_last_position, pieces_in_new_position
 
 	def _verifyBoardAndSearchPossibleMovements(self, board, last_board):
 		if board.shape != last_board.shape:
 			return board
+
 		pieces_not_in_last_position, pieces_in_new_position = self._calculateDifferencesBetweenBoards(last_board, board)
+		print(f"pieces not in last position: {pieces_not_in_last_position}")
+		print(f"pieces in new position: {pieces_in_new_position}")
+
 		pieces_moved, pieces_not_in_last_position, pieces_in_new_position = self._searchPossibleMovements(pieces_in_new_position, pieces_not_in_last_position)
+
+		print(f"pieces moved: {pieces_moved}")
+		print(f"pieces not in last position: {pieces_not_in_last_position}")
+		print(f"pieces in new position: {pieces_in_new_position}")
+
+
 		if len(pieces_moved) > 2:
 			print("too many moved pieces!")
 			for id, old_position, new_position in pieces_moved:
 				print(f"chess piece {BoardReader.piece_types[id]} moved from {old_position} to {new_position}")
 
 		# assumes pieces that we "lost" are in the same place, if there are not other pieces there
+
 		board = self._restoreMissingPieces(board, pieces_not_in_last_position)
 		return board, pieces_moved
 	def printBoard(self, board):
