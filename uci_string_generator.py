@@ -1,289 +1,235 @@
 import chess
-from numpy import int8
 
+def convertUCIPossibleMoves(possible_moves: list[tuple]) -> list[str]:
+	if possible_moves is None or len(possible_moves) == 0:
+		return []
+	
+	moves = _convertPossibleMoves(moves)
+	possible_moves_uci = [move.uci() for move in moves]
+	return possible_moves_uci
 
-class UCIStringGenerator:
-	piece_types = {
-		4: chess.PAWN,
-		5: chess.ROOK,
-		6: chess.KNIGHT,
-		7: chess.BISHOP,
-		8: chess.KING,
-		9: chess.QUEEN,
-		10: chess.PAWN,
-		11: chess.ROOK,
-		12: chess.KNIGHT,
-		13: chess.BISHOP,
-		14: chess.KING,
-		15: chess.QUEEN,
-  }
+def _convertPossibleMoves(moves):
+	uci_moves = _convertPossibleTwoPieceMoves(moves)
+	uci_moves += _convertPossibleOnePieceMoves(moves)
+	return uci_moves
 
-	def __init__(self, initial_board=None):
-		if (not initial_board is None) and  type(initial_board) != chess.Board:
-			initial_board = self._convertToChessModuleBoard(initial_board)
-		self.last_board = initial_board
+# One piece moves are moves that can be described by one piece only, that is, en passants and simple movements without promotions,
+#  captured pieces, or castlings
+# en passants are one piece moves because in this logic because the movement of the capturing pawn is enough to understand what happened.
+def _convertPossibleOnePieceMoves(moves):
+	one_piece_moves = []
+	for move in moves:
+		if _partOfMoveOutOfBoard(move):
+			continue
+		one_piece_moves.append(_generateUCIFromMove(move[1], move[2]))
+	return one_piece_moves
 
-	def getUCIPossibleMove(self, current_board, possible_moves):
-		if possible_moves is None or len(possible_moves) == 0:
-			return []
-		self.current_board = self._convertToChessModuleBoard(current_board)
-		possible_moves = self._convertPossibleMoves(possible_moves)
-		if not self.last_board is None:
-			possible_moves = self._filterMoveConvertLastToCurrentBoard(current_board, possible_moves)
-		self.last_board = self.current_board
+def _partOfMoveOutOfBoard(move):
+	return _coordinatesOutOfBoard(move[1]) or _coordinatesOutOfBoard(move[2])
 
-		possible_moves_uci = self._convertMovesToUCI(possible_moves)
+def _generateUCIFromMove(origin, destination, promotion_type=None):
+	origin = _getSquare(origin)
+	destination = _getSquare(destination)
+	move = chess.Move(origin, destination, promotion=promotion_type)
+	return move
 
-		return possible_moves_uci
-
-	def _getChessPieceChar(self, id):
-		char = chess.piece_symbol(self._getChessModulePieceType(id))
-
-		if self._pieceIsBlack(id):
-			char = char.upper()
-		return char
-
-	def _convertToChessModuleBoard(self, board):
-		board_fen = ""
-		for rank in range(board.shape[0]):
-			consecutive_empty_positions = 0
-			for file in range(2, board.shape[1] - 2):
-				id = board[rank][file]
-				if id == 0:
-					consecutive_empty_positions += 1
-					continue
-				elif consecutive_empty_positions > 0:
-					board_fen += str(consecutive_empty_positions)
-					consecutive_empty_positions = 0
-
-				board_fen += self._getChessPieceChar(id)
-			if consecutive_empty_positions > 0:
-					board_fen += str(consecutive_empty_positions)
-			if rank < 7:
-				board_fen += "/"
-
-		return chess.Board(board_fen)
-
-	def _filterMoveConvertLastToCurrentBoard(self, board, moves):
-		return moves
-
-	def _convertMovesToUCI(self, moves):
-		possible_moves_uci = []
-		for move in moves:
-			possible_moves_uci.append(move.uci())
-		return possible_moves_uci
-
-	def _convertPossibleMoves(self, moves):
-		uci_moves = self._convertPossibleTwoPieceMoves(moves)
-		uci_moves += self._convertPossibleOnePieceMoves(moves)
-		return uci_moves
-
-	# One piece moves are moves that can be described by one piece only, that is, en passants and simple movements without promotions,
-	#  captured pieces, or castlings
-	# en passants are one piece moves because in this logic because the movement of the capturing pawn is enough to understand what happened.
-	def _convertPossibleOnePieceMoves(self, moves):
-		one_piece_moves = []
-		for move in moves:
-			if self._partOfMoveOutOfBoard(move):
-				continue
-			one_piece_moves.append(self._generateUCIFromMove(move[1], move[2]))
-		return one_piece_moves
-
-	def _partOfMoveOutOfBoard(self, move):
-		return self._coordinatesOutOfBoard(move[1]) or self._coordinatesOutOfBoard(move[2])
-
-	def _generateUCIFromMove(self, origin, destination, promotion_type=None):
-		origin = self._getSquare(origin)
-		destination = self._getSquare(destination)
-		move = chess.Move(origin, destination, promotion=promotion_type)
-		# try:
-		# 	move = self.current_board.find_move(origin, destination, promotion=promotion_type)
-		# except chess.IllegalMoveError:
-		# 	move = None
-		return move
-
-	# Two piece moves are promotions, captures (that aren't en passant), and castlings.
-	# These moves have one thing in common: two pieces move, and the origin point of one is the destination of the other.
-	def _convertPossibleTwoPieceMoves(self, moves):
-		two_piece_moves = []
-		n_moves = len(moves)
-		if n_moves < 2:
-			return []
-		i = 0
-		while i < n_moves:
-			move_i = moves[i]
-			if self._movementHappenedOutOfBoard(move_i):
-				i += 1
-				continue
-				
-			j = i + 1
-
-			found_move_with_piece = False
+# Two piece moves are promotions, captures (that aren't en passant), and castlings.
+# These moves have one thing in common: two pieces move, and the origin point of one is the destination of the other.
+def _convertPossibleTwoPieceMoves(moves):
+	two_piece_moves = []
+	n_moves = len(moves)
+	if n_moves < 2:
+		return []
+	i = 0
+	while i < n_moves:
+		move_i = moves[i]
+		if _movementHappenedOutOfBoard(move_i):
+			i += 1
+			continue
 			
-			while j < n_moves:
-				move_j = moves[j]
-				if self._movementHappenedOutOfBoard(move_j):
-					continue
+		j = i + 1
 
-				two_piece_move = self._tryCreateTwoPieceMove(move_i, move_j)
-				if not two_piece_move is None:
-					two_piece_moves.append(two_piece_move)
-					moves.remove(move_i)
-					moves.remove(move_j)
-					n_moves -= 2
-					found_move_with_piece = True
-					break
-			
-			if not found_move_with_piece:
-				i += 1
+		found_move_with_piece = False
 		
-		return two_piece_moves
+		while j < n_moves:
+			move_j = moves[j]
+			if _movementHappenedOutOfBoard(move_j):
+				continue
 
-	def _tryCreateTwoPieceMove(self, first, second):
-		capture = self._tryCreateCaptureMove(first, second)
-		if not capture is None:
-			return capture
-
-		promotion = self._tryCreatePromotionMove(first, second)
-		if not promotion is None:
-			return promotion
-
-		castling = self._tryCreateCastlingMove(first, second)
-		if not castling is None:
-			return castling
-
-	# A capture involves one piece moving to the position of another, which is of the opposite color and moves to out of board
-	# en passants are handled as one piece moves.
-	def _tryCreateCaptureMove(self, first, second):
-		if self._piecesAreOfSameColor(first[0], second[0]):
-			return None
-
-		capturing = None
-		captured = None
-
-		if first[2] == second[1] and self._coordinatesOutOfBoard(second[2]):
-			capturing = first
-		elif second[2] == first[1] and self._coordinatesOutOfBoard(first[2]):
-			capturing = second
-		else:
-			return None
-
-		return self._generateUCIFromMove(capturing[1], capturing[2])
-
-	# A capture involves one pawn moving from board to graveyard and another piece of the same color (that isn't a king or pawn) moving to the
-	# last rank and to the same file as the original pawn
-	def _tryCreatePromotionMove(self, first, second):
-		if not self._piecesAreOfSameColor(first[0], second[0]):
-			return None
-
-		pawn = None
-		promoted = None
-
-		if self._isPawn(first) and self._isValidPromotionPieceType(second):
-			pawn = first
-			promoted = second
-		elif self._isPawn(second) and self._isValidPromotionPieceType(first):
-			pawn = second
-			promoted = first
-		else:
-			return None
-
-		promotion_type = self._getChessModulePieceType(promoted[0])
-
-		return self._generateUCIFromMove(pawn[1], promoted[2], promotion_type)
-	
-		# A castling move involves one king and rook of the same color moving along the same rank
-	# last rank and to the same file as the original pawn
-	def _tryCreateCastlingMove(self, first, second):
-		if not self._piecesAreOfSameColor(first[0], second[0]):
-			return None
-
-		king = None
-		rook = None
-
-		if self._isKing(first) and self._isRook(second):
-			pawn = first
-			promoted = second
-		elif self._isKing(second) and self._isRook(first):
-			king = second
-			rook = first
-		else:
-			return None
+			two_piece_move = _tryCreateTwoPieceMove(move_i, move_j)
+			if not two_piece_move is None:
+				two_piece_moves.append(two_piece_move)
+				moves.remove(move_i)
+				moves.remove(move_j)
+				n_moves -= 2
+				found_move_with_piece = True
+				break
 		
-		if not self._moveIsCastling(king, rook):
-			return None
-		
-		return self._generateUCIFromMove(king, rook)
-
-	def _moveIsCastling(self, king, rook):
-		if not self._areKingAndRookInCorrectRankForCastling(king, rook):
-			return False 
-
-		if not self._kingInStartingFile(king):
-			return False
-
-		return self._isKingSideCastling(king, rook) or self._isQueenSideCastling(king, rook)
-
-	def _areKingAndRookInCorrectRankForCastling(self, king, rook):
-		if self._pieceIsWhite(king):
-			expected_rank = 0
-		else: 
-			expected_rank = 7
-
-		return king[1][0] == expected_rank and king[2][0] == expected_rank and rook[1][0] == expected_rank and rook[2][0] == expected_rank
-		
-	def _kingInStartingFile(self, king):
-		return king[1][1] == 6
+		if not found_move_with_piece:
+			i += 1
 	
-	def _isKingSideCastling(self, king, rook):
-		return rook[1][1] == 9 and rook[2][1] == 7 and king[2][2] == 8
+	return two_piece_moves
+
+def _tryCreateTwoPieceMove(first, second):
+	capture = _tryCreateCaptureMove(first, second)
+	if not capture is None:
+		return capture
+
+	promotion = _tryCreatePromotionMove(first, second)
+	if not promotion is None:
+		return promotion
+
+	castling = _tryCreateCastlingMove(first, second)
+	if not castling is None:
+		return castling
+
+# A capture involves one piece moving to the position of another, which is of the opposite color and moves to out of board
+# en passants are handled as one piece moves.
+def _tryCreateCaptureMove(first, second):
+	if _piecesAreOfSameColor(first[0], second[0]):
+		return None
+
+	capturing = None
+	captured = None
+
+	if first[2] == second[1] and _coordinatesOutOfBoard(second[2]):
+		capturing = first
+	elif second[2] == first[1] and _coordinatesOutOfBoard(first[2]):
+		capturing = second
+	else:
+		return None
+
+	return _generateUCIFromMove(capturing[1], capturing[2])
+
+# A capture involves one pawn moving from board to graveyard and another piece of the same color (that isn't a king or pawn) moving to the
+# last rank and to the same file as the original pawn
+def _tryCreatePromotionMove(first, second):
+	if not _piecesAreOfSameColor(first[0], second[0]):
+		return None
+
+	pawn = None
+	promoted = None
+
+	if _isPawn(first) and _isValidPromotionPieceType(second):
+		pawn = first
+		promoted = second
+	elif _isPawn(second) and _isValidPromotionPieceType(first):
+		pawn = second
+		promoted = first
+	else:
+		return None
+
+	promotion_type = _getChessModulePieceType(promoted[0])
+
+	return _generateUCIFromMove(pawn[1], promoted[2], promotion_type)
+
+# A castling move involves one king and rook of the same color moving along the same rank
+# last rank and to the same file as the original pawn
+def _tryCreateCastlingMove(first, second):
+	if not _piecesAreOfSameColor(first[0], second[0]):
+		return None
+
+	king = None
+	rook = None
+
+	if _isKing(first) and _isRook(second):
+		pawn = first
+		promoted = second
+	elif _isKing(second) and _isRook(first):
+		king = second
+		rook = first
+	else:
+		return None
 	
-	def _isQueenSideCastling(self, king, rook):
-		return rook[1][1] == 2 and rook[2][1] == 5 and king[2][2] == 4
-
-	def _piecesAreOfSameColor(self, first_piece_id, second_piece_id):
-		if self._pieceIsWhite(first_piece_id):
-			return self._pieceIsWhite(second_piece_id)
-		else:
-			return self._pieceIsBlack(second_piece_id)
-
-	def _pieceIsWhite(self, id):
-		return 4 <= id and id <= 9
-
-	def _pieceIsBlack(self, id):
-		return 10 <= id and id <= 15
-
-	def _isPawn(self, move):
-		id = move[0]
-		return id == 4 or id == 10
-
-	def _isKing(self, move):
-		id = move[0]
-		return id == 8 or id == 14
+	if not _moveIsCastling(king, rook):
+		return None
 	
-	def _isRook(self, move):
-		id = move[0]
-		return id == 5 or id == 11
+	return _generateUCIFromMove(king, rook)
 
-	def _isValidPromotionPieceType(self, move):
-		return not (self._isPawn(move) or self._isKing(move))
+def _moveIsCastling(king, rook):
+	if not _areKingAndRookInCorrectRankForCastling(king, rook):
+		return False 
 
-	def _getChessModulePieceType(self, id):
-		return UCIStringGenerator.piece_types[id]
+	if not _kingInStartingFile(king):
+		return False
 
-	def _movementHappenedOutOfBoard(self, move):
-		return self._coordinatesOutOfBoard(move[1]) and self._coordinatesOutOfBoard(move[2])
+	return _isKingSideCastling(king, rook) or _isQueenSideCastling(king, rook)
 
-	def _coordinatesOutOfBoard(self, coordinates):
-		(rank, file) = coordinates
-		# graveyard files are out of board
-		return (not rank in range(0, 8)) or (not file in range(2, 10))
+def _areKingAndRookInCorrectRankForCastling(king, rook):
+	if _pieceIsWhite(king):
+		expected_rank = 0
+	else: 
+		expected_rank = 7
 
-	def _getSquare(self, coordinates):
-		return chess.parse_square(self._getSquareName(coordinates))
+	return king[1][0] == expected_rank and king[2][0] == expected_rank and rook[1][0] == expected_rank and rook[2][0] == expected_rank
+	
+def _kingInStartingFile(king):
+	return king[1][1] == 6
 
-	ascii_a = ord('a')
+def _isKingSideCastling(king, rook):
+	return rook[1][1] == 9 and rook[2][1] == 7 and king[2][2] == 8
 
-	def _getSquareName(self, coordinates):
-		(rank, file) = coordinates
-		return chr(UCIStringGenerator.ascii_a + file - 2) + str(rank + 1)
+def _isQueenSideCastling(king, rook):
+	return rook[1][1] == 2 and rook[2][1] == 5 and king[2][2] == 4
+
+def _piecesAreOfSameColor(first_piece_id, second_piece_id):
+	if _pieceIsWhite(first_piece_id):
+		return _pieceIsWhite(second_piece_id)
+	else:
+		return _pieceIsBlack(second_piece_id)
+
+def _pieceIsWhite(id):
+	return 4 <= id and id <= 9
+
+def _pieceIsBlack(id):
+	return 10 <= id and id <= 15
+
+def _isPawn(move):
+	id = move[0]
+	return id == 4 or id == 10
+
+def _isKing(move):
+	id = move[0]
+	return id == 8 or id == 14
+
+def _isRook(move):
+	id = move[0]
+	return id == 5 or id == 11
+
+def _isValidPromotionPieceType(move):
+	return not (_isPawn(move) or _isKing(move))
+
+_piece_types = {
+	4: chess.PAWN,
+	5: chess.ROOK,
+	6: chess.KNIGHT,
+	7: chess.BISHOP,
+	8: chess.KING,
+	9: chess.QUEEN,
+	10: chess.PAWN,
+	11: chess.ROOK,
+	12: chess.KNIGHT,
+	13: chess.BISHOP,
+	14: chess.KING,
+	15: chess.QUEEN,
+}
+
+def _getChessModulePieceType(id):
+	return _piece_types[id]
+
+def _movementHappenedOutOfBoard(move):
+	return _coordinatesOutOfBoard(move[1]) and _coordinatesOutOfBoard(move[2])
+
+def _coordinatesOutOfBoard(coordinates):
+	(rank, file) = coordinates
+	# graveyard files are out of board
+	return (not rank in range(0, 8)) or (not file in range(2, 10))
+
+def _getSquare(coordinates):
+	return chess.parse_square(_getSquareName(coordinates))
+
+ascii_code_for_lowercase_a = ord('a')
+
+def _getSquareName(coordinates):
+	(rank, file) = coordinates
+	return chr(ascii_code_for_lowercase_a + file - 2) + str(rank + 1)

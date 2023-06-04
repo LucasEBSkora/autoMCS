@@ -5,7 +5,7 @@ from cv2 import imread # used for tests
 from datetime import datetime # debug image printing
 from numpy import int32, int8, ravel, zeros, float32, mean, flip
 from os import system # clearing image folder
-from uci_string_generator import UCIStringGenerator
+from uci_string_generator import convertUCIPossibleMoves
 
 #from picamera_camera import Camera
 #from opencv_camera import Camera
@@ -35,7 +35,6 @@ class BoardReader:
 		self.write_steps = write_steps
 		self.DEBUG_MODE = DEBUG_MODE
 		self.print_time = print_time
-		self.UCI_generator = UCIStringGenerator()
 
 		if self.DEBUG_MODE:
 			self.debug_path = None
@@ -343,7 +342,8 @@ class BoardReader:
 
 		board = self._restoreMissingPieces(board, pieces_not_in_last_position)
 		return board, pieces_moved
-	def printBoard(self, board):
+
+	def printBoard(self, board: int8):
 		'''pretty prints the chess board matrix'''
 		for i in range(board.shape[0] - 1, -1, -1):
 			line = ""
@@ -360,54 +360,48 @@ class BoardReader:
 					line += '?'
 			print(line)
 
-	def getBoardRealPositionsAndPossibleMoves(self):
-		''' takes picture and gets chess board matrix from it'''
+	def updateBoard(self):
 		if self.write_steps:
 			self.now = self._getTimeString()
 
 		ids_and_corners = self._getArucoCorners()
 		if len(ids_and_corners) == 0:
-			return None, None, None
-
-		time = datetime.now()
-
+			return
+		
 		board_corners = self._getBoardCorners(ids_and_corners)
 
-		if not self.write_steps and self.print_time:
-			print(f"found corners in {(datetime.now() - time).total_seconds()} seconds!")
-
 		if board_corners is None:
-			return None, None, None
+			return
 
-		time = datetime.now()
 		ids_and_transformed_corners = self._trasformPerspective(board_corners, ids_and_corners)
 
-		if not self.write_steps and self.print_time:
-			print(f"transformed perspective in {(datetime.now() - time).total_seconds()} seconds!")
-
-		time = datetime.now()
 		piece_centers = self._getPieceCenters(ids_and_transformed_corners)
-		if not self.write_steps and self.print_time:
-			print(f"calculated centers in {(datetime.now() - time).total_seconds()} seconds!")
 
-		time = datetime.now()
-		board, real_positions = self._generateBoard(piece_centers)
-		if not self.write_steps and self.print_time:
-			print(f"generated boards in {(datetime.now() - time).total_seconds()} seconds!")
-			print("--------------------------------------------------------------------------------")
-
-		possible_moves = None
-
+		board, self.real_positions = self._generateBoard(piece_centers)
+		
 		if not self.last_board is None:
-			board, possible_moves = self._verifyBoardAndSearchPossibleMovements(board, self.last_board)
-			possible_moves = self.UCI_generator.getUCIPossibleMove(board, possible_moves)
+			board, self.possible_moves = self._verifyBoardAndSearchPossibleMovements(board, self.last_board)
 		self.last_board = board
 
-		return board, real_positions, possible_moves
+	def updateBoardGetMoves(self) -> list[str]:
+		self.updateBoard()
+		if self.possible_moves is None:
+			return []
+		uci_moves = convertUCIPossibleMoves(self.possible_moves)
+		self.possible_moves.clear()
+		return uci_moves
+
+	def getBoard(self) -> int8:
+		return self.last_board
+	
+	def getPieceRealPositionsMillimeters(self) -> int32:
+		self.updateBoard()
+		return self.real_positions
 
 if __name__ == "__main__":
-	reader = BoardReader(write_steps = True)
-	board, _, _ = reader.getBoardRealPositionsAndPossibleMoves()
+	reader = BoardReader(write_steps = True, DEBUG_MODE=True)
+	reader.updateBoard()
+	board = reader.getBoard()
 	if board is None:
 		print(":(")
 	else:
