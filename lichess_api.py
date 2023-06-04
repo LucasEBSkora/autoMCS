@@ -7,13 +7,14 @@ import random
 import states
 from board_reader import BoardReader
 from board_comparator import boardPiecePositionsIdentical
+
 def atoi(value: any, default: int = 0) -> int:
     try:
         return int(value)
     except ValueError:
         return default
 
-with open("./lichess.token") as f:
+with open("./.lichess.token") as f:
     token = f.read()
 
 session = berserk.TokenSession(token=token)
@@ -27,6 +28,7 @@ def physical_board_in_desired_state(board: chess.Board):
     return boardPiecePositionsIdentical(board, reader.getBoard())
 
 def put_physical_board_desired_state(board: chess.Board):
+    global reader
     if reader is None:
         return
     while not physical_board_in_desired_state(board):
@@ -223,13 +225,14 @@ def print_menu() -> str:
     return input("1- New game against AI\n2- New game against player\n3- Quit\n")
 
 def print_interface_option():
-    option = input("1- play on command line\n2- Play using AutoMCS board")
-    if option == atoi(2):
+    option = input("1- play on command line\n2- Play using AutoMCS board\n")
+    if atoi(option) == 2:
         UsePhysicalBoard = True
 
 def main() -> None:
     print_interface_option()
     if UsePhysicalBoard:
+	print("initializing autoMCS computer vision module, please wait...")
         global reader
         reader = BoardReader()
     while (opt := print_menu()) != "3":
