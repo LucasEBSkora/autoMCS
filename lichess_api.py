@@ -125,10 +125,9 @@ def get_move(board):
             detectedMoves = reader.updateBoardGetMoves()
             n_moves = len(detectedMoves)
             if n_moves == 1:
-                return move
+                return detectedMoves[0]
             if n_moves == 0:
                 input("no moves detected on board! If you already did your move, please just press enter so it tries detecting it again")
-            
             input("too many moves detected! You might have made an illegal move that was interpreted as two moves.\nplease return the board to its last legal state and try again")
             put_physical_board_desired_state(board)
             input("make a move on the board and press enter")
@@ -156,7 +155,9 @@ def create_new_game_ai():
     print(full_game)
     board = chess.Board(game["fen"])
     print(board)
+    global UsePhysicalBoard
     if UsePhysicalBoard:
+        print("checking if board in starting state...")
         put_physical_board_desired_state(board)
     color_id = 1 if color == "black" else 0 
     print("---------------------------")
@@ -227,12 +228,13 @@ def print_menu() -> str:
 def print_interface_option():
     option = input("1- play on command line\n2- Play using AutoMCS board\n")
     if atoi(option) == 2:
+        global UsePhysicalBoard
         UsePhysicalBoard = True
 
 def main() -> None:
     print_interface_option()
     if UsePhysicalBoard:
-	print("initializing autoMCS computer vision module, please wait...")
+        print("initializing autoMCS computer vision module, please wait...")
         global reader
         reader = BoardReader()
     while (opt := print_menu()) != "3":

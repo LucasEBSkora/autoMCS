@@ -269,12 +269,14 @@ class BoardReader:
 			real_positions[coord[0]][coord[1]] = center
 		board = flip(board, axis=0)
 		return board, real_positions
+	def _emptyOrInvalid(self, id):
+		return id < 4 or 15 < id
 
 	def _isNewPieceInPosition(self, last_id, new_id):
-		return last_id == 0 and new_id > 0
+		return self._emptyOrInvalid(last_id) and new_id > 0
 
 	def _isPieceNoLongerInPosition(self, last_id, new_id):
-		return last_id > 0 and new_id == 0
+		return last_id > 0 and self._emptyOrInvalid(new_id)
 
 	def _isDifferentPieceInPosition(self, last_id, new_id):
 		return last_id != new_id

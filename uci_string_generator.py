@@ -46,11 +46,11 @@ def _convertPossibleTwoPieceMoves(moves):
 		if _movementHappenedOutOfBoard(move_i):
 			i += 1
 			continue
-			
+
 		j = i + 1
 
 		found_move_with_piece = False
-		
+
 		while j < n_moves:
 			move_j = moves[j]
 			if _movementHappenedOutOfBoard(move_j):
