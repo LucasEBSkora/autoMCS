@@ -56,6 +56,9 @@ class BoardReader:
 		system("rm arucos/*") # clears aruco image folder so we don't get images we already have through scp command
 		if self.write_steps:
 			self.now = self._getTimeString() # gets current time string to use in image names
+		self.updateBoard()
+		while self.last_position_corners is None:
+			self.updateBoard()
 
 	def _getTimeString(self):
 		if self.DEBUG_MODE and not self.debug_path is None:

@@ -123,13 +123,19 @@ def get_move(board):
 	if UsePhysicalBoard:
 		global reader
 		input("make a move on the board and press enter")
+		attempts_before_request_try_again = 3
 		while True:
 			detectedMoves = reader.updateBoardGetMoves()
 			n_moves = len(detectedMoves)
 			if n_moves == 1:
 				return detectedMoves[0]
 			if n_moves == 0:
-				input("no moves detected on board! If you already did your move, please just press enter so it tries detecting it again")
+				attempts_before_request_try_again -= 1
+				if attempts_before_request_try_again <= 0:
+					attempts_before_request_try_again = 3
+					input("no moves detected on board! If you already did your move, please just press enter so it tries detecting it again")
+				continue
+
 			input(f"too many moves detected!\n{detectedMoves}\nYou might have made an illegal move that was interpreted as two moves.\nplease return the board to its last legal state and try again")
 			put_physical_board_desired_state(board)
 			input("make a move on the board and press enter")
@@ -207,7 +213,7 @@ def create_new_game_player():
 				if len(full_game["state"]["moves"].split()) == 1: 
 					states.push_state(states.GameState.BLACKS_TURN)
 					state = states.GameState.BLACKS_TURN
-				
+
 				state = handle_lichess_gameState(state, full_game["state"], board, color_id, game_id)
 				states.push_state(state)
 
@@ -238,7 +244,7 @@ def main() -> None:
 	if UsePhysicalBoard:
 		print("initializing autoMCS computer vision module, please wait...")
 		global reader
-		reader = BoardReader()
+		reader = BoardReader(resolution = (1920, 1296))
 	while (opt := print_menu()) != "3":
 		if opt == "1": create_new_game_ai()
 		if opt == "2": create_new_game_player()
