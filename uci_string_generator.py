@@ -64,7 +64,7 @@ def _convertPossibleTwoPieceMoves(moves):
 				n_moves -= 2
 				found_move_with_piece = True
 				break
-		
+			j += 1
 		if not found_move_with_piece:
 			i += 1
 	
@@ -82,6 +82,8 @@ def _tryCreateTwoPieceMove(first, second):
 	castling = _tryCreateCastlingMove(first, second)
 	if not castling is None:
 		return castling
+
+	return None
 
 # A capture involves one piece moving to the position of another, which is of the opposite color and moves to out of board
 # en passants are handled as one piece moves.
@@ -133,8 +135,8 @@ def _tryCreateCastlingMove(first, second):
 	rook = None
 
 	if _isKing(first) and _isRook(second):
-		pawn = first
-		promoted = second
+		king = first
+		rook = second
 	elif _isKing(second) and _isRook(first):
 		king = second
 		rook = first
@@ -144,7 +146,7 @@ def _tryCreateCastlingMove(first, second):
 	if not _moveIsCastling(king, rook):
 		return None
 	
-	return _generateUCIFromMove(king, rook)
+	return _generateUCIFromMove(king[1], king[2])
 
 def _moveIsCastling(king, rook):
 	if not _areKingAndRookInCorrectRankForCastling(king, rook):
@@ -156,7 +158,7 @@ def _moveIsCastling(king, rook):
 	return _isKingSideCastling(king, rook) or _isQueenSideCastling(king, rook)
 
 def _areKingAndRookInCorrectRankForCastling(king, rook):
-	if _pieceIsWhite(king):
+	if _pieceIsWhite(king[0]):
 		expected_rank = 0
 	else: 
 		expected_rank = 7
@@ -167,10 +169,10 @@ def _kingInStartingFile(king):
 	return king[1][1] == 6
 
 def _isKingSideCastling(king, rook):
-	return rook[1][1] == 9 and rook[2][1] == 7 and king[2][2] == 8
+	return rook[1][1] == 9 and rook[2][1] == 7 and king[2][1] == 8
 
 def _isQueenSideCastling(king, rook):
-	return rook[1][1] == 2 and rook[2][1] == 5 and king[2][2] == 4
+	return rook[1][1] == 2 and rook[2][1] == 5 and king[2][1] == 4
 
 def _piecesAreOfSameColor(first_piece_id, second_piece_id):
 	if _pieceIsWhite(first_piece_id):
