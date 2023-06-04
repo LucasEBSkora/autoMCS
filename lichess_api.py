@@ -34,7 +34,7 @@ def put_physical_board_desired_state(board: chess.Board):
 	while not physical_board_in_desired_state(board):
 		print("Please leave the board in the following state and press enter:")
 		print(board)
-		print("current board state is:")
+		print("current detected board state is:")
 		print(reader.printBoard(reader.getBoard()))
 		input("waiting for player confirmation")
 
@@ -42,7 +42,9 @@ def handle_lichess_gameState(state: states.GameState, event: dict[str, Any], boa
 	moves = event['moves'].split()
 
 	while len(moves) > len(board.move_stack):
-		board.push_uci(moves[-(len(moves) - len(board.move_stack))])
+		move = moves[-(len(moves) - len(board.move_stack))]
+		board.push_uci(move)
+		print(move)
 		if UsePhysicalBoard:
 			put_physical_board_desired_state(board)
 		print(board)
@@ -73,7 +75,7 @@ def handle_lichess_gameState(state: states.GameState, event: dict[str, Any], boa
 	return state
 
 def print_choices_menu(state: states.GameState) -> None:
-	print(state.value)
+	print(state)
 	actions = states.TRANSITIONS[state].keys()
 	for i, action in enumerate(actions):
 		print(f"{i + 1} - {action.value}")
@@ -128,7 +130,7 @@ def get_move(board):
 				return detectedMoves[0]
 			if n_moves == 0:
 				input("no moves detected on board! If you already did your move, please just press enter so it tries detecting it again")
-			input("too many moves detected! You might have made an illegal move that was interpreted as two moves.\nplease return the board to its last legal state and try again")
+			input(f"too many moves detected!\n{detectedMoves}\nYou might have made an illegal move that was interpreted as two moves.\nplease return the board to its last legal state and try again")
 			put_physical_board_desired_state(board)
 			input("make a move on the board and press enter")
 
@@ -172,12 +174,11 @@ def create_new_game_ai():
 		states.push_state(state)
 
 		for event in game_stream:
-			print(event)
 			if event["type"] == "gameState":
 				if event["status"] == "started":
 					state = handle_lichess_gameState(state, event, board, color_id, game_id)
 					states.push_state(state)
-		print(state.value)
+		print(state)
 	except Exception as err:
 		client.board.resign_game(game_id)
 		print(f"Error occured: {err}")

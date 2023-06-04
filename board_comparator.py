@@ -4,10 +4,6 @@ from chess import Board
 def boardPiecePositionsIdentical(first, second):
 	first_board_fen_positions = _getChessBoardFenPositions(first)
 	second_board_fen_positions = _getReaderBoardFenPositions(second)
-	print(first_board_fen_positions)
-	print(second_board_fen_positions)
-	print(len(first_board_fen_positions))
-	print(len(second_board_fen_positions))
 
 	return first_board_fen_positions == second_board_fen_positions
 
