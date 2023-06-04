@@ -12,6 +12,6 @@ board_dimensions = (8, 12)
 reader = BoardReader(resolution, board_dimensions, True, True)
 
 for image in test_files:
-  print(image)
-  reader.debug_path = image
-  board = reader.getBoard()
+	print(image)
+	reader.debug_path = image
+	board = reader.getBoard()

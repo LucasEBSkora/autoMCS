@@ -12,7 +12,7 @@ board_dimensions = (8, 12)
 reader = BoardReader(resolution, board_dimensions, DEBUG_MODE= True, write_steps=True)
 
 for image in test_files:
-  reader.debug_path = image
-  board, real_positions, possible_moves = reader.getBoardRealPositionsAndPossibleMoves()
-  reader.printBoard(board)
-  print(possible_moves)
+	reader.debug_path = image
+	board, real_positions, possible_moves = reader.getBoardRealPositionsAndPossibleMoves()
+	reader.printBoard(board)
+	print(possible_moves)
