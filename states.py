@@ -65,7 +65,7 @@ def start_game() -> GameState:
 def handle_transition(state: GameState, action: GameAction) -> GameState:
 	if action not in TRANSITIONS[state].keys():
 		raise ValueError(f"Invalid `{action}` action for state: {state}. This error should never happen, so it's certainly a bug")
-		return TRANSITIONS[state].get(action)()
+	return TRANSITIONS[state].get(action)()
 
 def push_state(state: GameState) -> None:
 	_state_history.append(state)

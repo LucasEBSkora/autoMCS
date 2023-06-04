@@ -133,14 +133,13 @@ def get_move(board):
 			input(f"too many moves detected!\n{detectedMoves}\nYou might have made an illegal move that was interpreted as two moves.\nplease return the board to its last legal state and try again")
 			put_physical_board_desired_state(board)
 			input("make a move on the board and press enter")
-
 	else:
-		move = input("Make a legal uci move: ")
+		return input("Make a legal uci move: ")
 
 def handle_move(board: chess.Board, game_id: str):
 	move = get_move(board)
 	while not is_legal_move(board, move):
-		move = get_move()
+		move = get_move(board)
 	board.push_uci(move)
 	print(board)
 	client.board.make_move(game_id, move)
@@ -183,6 +182,7 @@ def create_new_game_ai():
 		client.board.resign_game(game_id)
 		print(f"Error occured: {err}")
 		print("Game aborted")
+		raise err
 
 def create_new_game_player():
 	color = random.choice(["black", "white"])
@@ -222,6 +222,7 @@ def create_new_game_player():
 				client.board.resign_game(game_id)
 				print(f"Error occured: {err}")
 				print("Game aborted")
+				raise err
 
 def print_menu() -> str:
 	return input("1- New game against AI\n2- New game against player\n3- Quit\n")
