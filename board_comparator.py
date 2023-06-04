@@ -1,18 +1,18 @@
 from numpy import int8
 from chess import Board
 
-def boardPiecePositionsIdentical(first: Board | int8, second: Board | int8):
+def boardPiecePositionsIdentical(first, second):
   first_board_fen_positions = _getBoardFenPositions(first)
   second_board_fen_positions = _getBoardFenPositions(second)
 
   return first_board_fen_positions == second_board_fen_positions
 
-def _getBoardFenPositions(board: Board | int8) -> str:
+def _getBoardFenPositions(board) -> str:
   if board is Board:
     return _getChessBoardFenPositions(board)
   elif board is int8:
     return _getReaderBoardFenPositions(board)
-  
+
 def _getChessBoardFenPositions(board: Board) -> str:
   return board.fen().split(' ')[0]
 

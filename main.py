@@ -11,12 +11,13 @@ resolution = (1920, 1088) #viable at 7mm
 #resolution = (3296, 2464) #kills the crab
 board_dimensions = (8, 12)
 
-reader = BoardReader(resolution, board_dimensions, write_steps = False)
+reader = BoardReader(resolution, board_dimensions)
 
 finish_game = ""
 
 while finish_game != "q":
-	board, real_positions, possible_moves = reader.getBoardRealPositionsAndPossibleMoves()
+	possible_moves = reader.updateBoardGetMoves()
+	board = reader.getBoard()
 	if board is None:
 		print(":(")
 	else:

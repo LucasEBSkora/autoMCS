@@ -3,8 +3,8 @@ import chess
 def convertUCIPossibleMoves(possible_moves: list[tuple]) -> list[str]:
 	if possible_moves is None or len(possible_moves) == 0:
 		return []
-	
-	moves = _convertPossibleMoves(moves)
+
+	moves = _convertPossibleMoves(possible_moves)
 	possible_moves_uci = [move.uci() for move in moves]
 	return possible_moves_uci
 

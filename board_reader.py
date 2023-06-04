@@ -51,6 +51,7 @@ class BoardReader:
 
 		self.last_position_corners = None
 		self.last_board = None
+		self.possible_moves = []
 
 		system("rm arucos/*") # clears aruco image folder so we don't get images we already have through scp command
 		if self.write_steps:
@@ -368,7 +369,6 @@ class BoardReader:
 		ids_and_corners = self._getArucoCorners()
 		if len(ids_and_corners) == 0:
 			return
-		
 		board_corners = self._getBoardCorners(ids_and_corners)
 
 		if board_corners is None:
@@ -379,22 +379,20 @@ class BoardReader:
 		piece_centers = self._getPieceCenters(ids_and_transformed_corners)
 
 		board, self.real_positions = self._generateBoard(piece_centers)
-		
+
 		if not self.last_board is None:
 			board, self.possible_moves = self._verifyBoardAndSearchPossibleMovements(board, self.last_board)
 		self.last_board = board
 
 	def updateBoardGetMoves(self) -> list[str]:
 		self.updateBoard()
-		if self.possible_moves is None:
-			return []
 		uci_moves = convertUCIPossibleMoves(self.possible_moves)
 		self.possible_moves.clear()
 		return uci_moves
 
 	def getBoard(self) -> int8:
 		return self.last_board
-	
+
 	def getPieceRealPositionsMillimeters(self) -> int32:
 		self.updateBoard()
 		return self.real_positions
