@@ -7,7 +7,7 @@ from numpy import int32, int8, ravel, zeros, float32, mean, flip
 from os import system # clearing image folder
 from uci_string_generator import convertUCIPossibleMoves
 
-#from picamera_camera import Camera
+from picamera_camera import Camera
 #from opencv_camera import Camera
 
 class BoardReader:
@@ -321,6 +321,7 @@ class BoardReader:
 					len_not_in_last_position_pieces -= 1
 					found = True
 					break
+				j += 1
 			if not found:
 				i += 1
 
