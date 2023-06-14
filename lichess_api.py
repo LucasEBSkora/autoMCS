@@ -10,6 +10,7 @@ from board_comparator import boardPiecePositionsIdentical
 from display import Display
 from encoder import setupEncoder, selectOptionEncoder
 from time import sleep
+import serial
 
 def atoi(value: any, default: int = 0) -> int:
 	try:
@@ -28,6 +29,7 @@ UseDisplay = True
 reader = None
 display = None
 encoder = None
+ser = serial.Serial("/dev/ttyS0", 9600)
 
 def physical_board_in_desired_state(board: chess.Board):
 	reader.updateBoard()
@@ -44,6 +46,34 @@ def put_physical_board_desired_state(board: chess.Board):
 		print(reader.printBoard(reader.getBoard()))
 		input("waiting for player confirmation")
 
+def send_serial(board, move):
+	global ser
+	global reader
+	msg = bytearray([int(board.piece_at(i) != None) for i in range(0, 64)])
+	msg.append(ord('|'))
+	#from square
+	x1 = ord(move[0]) + 2 - ord('a')
+	y1 = int(move[1]) + 1
+	msg.append(x1)
+	msg.append(ord('|'))
+	msg.append(y1)
+	msg.append(ord('|'))
+	#from square (mm)
+	real_pos = reader.getPieceRealPositionsMilimiters()
+	x_mm = real_pos[x1][y1][0]
+	y_mm = real_pos[x1][y1][1]
+	msg.append(x1)
+	msg.append(ord('|')
+	msg.append(y1)
+	msg.append(ord('|'))
+	#to square
+	msg.append(ord(move[2]) + 2 0 ord('a'))
+	msg.append(ord('|'))
+	msg.append(int(move[3]) + 1)
+	msg.append(ord('|'))
+	print(msg)
+	ser.write(msg)
+
 def handle_lichess_gameState(state: states.GameState, event: dict[str, Any], board: chess.Board, color_id: int, game_id: str):
 	moves = event['moves'].split()
 
@@ -52,23 +82,30 @@ def handle_lichess_gameState(state: states.GameState, event: dict[str, Any], boa
 		board.push_uci(move)
 		print(move)
 		if UsePhysicalBoard:
+			send_serial(board, move)
 			put_physical_board_desired_state(board)
 		print(board)
 			
 	# Has draw offer to handle
 	if event.get("bdraw") and color_id == 0:
-		state = states.GameState.WHANDLING_DRAW
+		client.board.decline_draw(game_id)
+#		state = states.GameState.WHANDLING_DRAW
+#		if UseDisplay:
+#			display.setTopText("DRAW OFFER")
 	elif event.get("wdraw") and color_id == 1:
-		state = states.GameState.BHANDLING_DRAW
+		client.board.decline_draw(game_id)
+#		if UseDisplay:
+ #                       display.setTopText("DRAW OFFER")
+#		state = states.GameState.BHANDLING_DRAW
 	# Has takeback offer to handle
 	elif event.get("btakeback") and color_id == 0:
 		client.board.decline_takeback(game_id)
 	elif event.get("wtakeback") and color_id == 1:
 		client.board.decline_takeback(game_id)
 			
-	if len(event["moves"]) < len(board.move_stack):
-		while len(event["moves"]) < len(board.move_stack): board.pop()
-		return states.handle_transition(state, states.GameAction.ACCEPT)
+#	if len(event["moves"]) < len(board.move_stack):
+#		while len(event["moves"]) < len(board.move_stack): board.pop()
+#		return states.handle_transition(state, states.GameAction.ACCEPT)
 
 	# User's turn
 	if len(event["moves"].split()) % 2 == color_id:
@@ -78,7 +115,7 @@ def handle_lichess_gameState(state: states.GameState, event: dict[str, Any], boa
 		state = states.handle_transition(state, states.GameAction.DECLINE)
 	else:
 		state = states.handle_transition(state, states.GameAction.MOVE)
-	return state
+	return state0
 
 def print_choices_menu(state: states.GameState) -> None:
 	print(state)
@@ -134,7 +171,9 @@ def is_legal_move(board: chess.Board, move: str):
 def get_move(board):
 	if UsePhysicalBoard:
 		global reader
-		input("make a move on the board and press enter")
+		global display
+		global encoder
+		#input("make a move on the board and press enter")
 		attempts_before_request_try_again = 3
 		while True:
 			detectedMoves = reader.updateBoardGetMoves()
@@ -145,12 +184,21 @@ def get_move(board):
 				attempts_before_request_try_again -= 1
 				if attempts_before_request_try_again <= 0:
 					attempts_before_request_try_again = 3
-					input("no moves detected on board! If you already did your move, please just press enter so it tries detecting it again")
+					display.setTopText("NO MOVE")
+					display.drawTitle()
+					sleep(2)
+					display.setTopText("TRY AGAIN")
+					selectOptionEncoder(["Move"], display, encoder)
+					#input("no moves detected on board! If you already did your move, please just press enter so it tries detecting it again")
 				continue
 
-			input(f"too many moves detected!\n{detectedMoves}\nYou might have made an illegal move that was interpreted as two moves.\nplease return the board to its last legal state and try again")
+			#input(f"too many moves detected!\n{detectedMoves}\nYou might have made an illegal move that was interpreted as two moves.\nplease return the board to its last legal state and try again")
+			display.setTopText("TO MANY MOVES")
+			selectOptionEncoder(["Return to original state"], display, encoder)
 			put_physical_board_desired_state(board)
-			input("make a move on the board and press enter")
+			display.clearDisplay()
+			selectOptionEncoder(["Move"], display, encoder)
+			#input("make a move on the board and press enter")
 	else:
 		return input("Make a legal uci move: ")
 
@@ -200,7 +248,13 @@ def create_new_game_ai():
 				if event["status"] == "started":
 					state = handle_lichess_gameState(state, event, board, color_id, game_id)
 					states.push_state(state)
-		print(state)
+		if UseDisplay:
+			display.setTopText(state.value)
+			display.drawTitle()
+			sleep(2)
+			display.setTopText(None)
+		else:
+			print(state.value)
 	except Exception as err:
 		client.board.resign_game(game_id)
 		print(f"Error occured: {err}")
@@ -222,6 +276,11 @@ def create_new_game_player():
 			print(full_game)
 			board = chess.Board(game["fen"])
 			print(board)
+			global UsePhysicalBoard
+			if UsePhysicalBoard:
+				print("checking if board in starting state...")
+				put_physical_board_desired_state(board)
+
 			color_id = 1 if color == "black" else 0 
 			print("---------------------------")
 
@@ -240,7 +299,14 @@ def create_new_game_player():
 						if event["status"] == "started":
 							state = handle_lichess_gameState(state, event, board, color_id, game_id)
 							states.push_state(state)
-				print(state.value)
+				if UseDisplay:
+					display.setTopText(state.value)
+					display.drawTitle()
+					sleep(2)
+					display.setTopText(None)
+				else:
+					print(state.value)
+
 			except Exception as err:
 				client.board.resign_game(game_id)
 				print(f"Error occured: {err}")

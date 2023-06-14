@@ -24,14 +24,14 @@ class GameAction(Enum):
 TRANSITIONS: dict[GameState, dict[GameAction, Callable[[], GameState]]] = {
 	GameState.WHITES_TURN: {
 		GameAction.MOVE:           lambda: GameState.BLACKS_TURN,
-		GameAction.OFFER_DRAW:     lambda: GameState.BHANDLING_DRAW,
-		GameAction.OFFER_TAKEBACK: lambda: GameState.BHANDLING_TAKEBACK,
+#		GameAction.OFFER_DRAW:     lambda: GameState.WHITES_TURN,
+#		GameAction.OFFER_TAKEBACK: lambda: GameState.BHANDLING_TAKEBACK,
 		GameAction.RESIGN:         lambda: GameState.BLACK_WINS,
 	},
 	GameState.BLACKS_TURN: {
 		GameAction.MOVE:           lambda: GameState.WHITES_TURN,
-		GameAction.OFFER_DRAW:     lambda: GameState.WHANDLING_DRAW,
-		GameAction.OFFER_TAKEBACK: lambda: GameState.WHANDLING_TAKEBACK,
+#		GameAction.OFFER_DRAW:     lambda: GameState.BLACKS_TURN,
+#		GameAction.OFFER_TAKEBACK: lambda: GameState.WHANDLING_TAKEBACK,
 		GameAction.RESIGN:         lambda: GameState.WHITE_WINS,
 	},
 	GameState.WHANDLING_DRAW: {

@@ -3,13 +3,14 @@ from time import sleep
 import RPi.GPIO as GPIO
 from display import Display 
 
-ENCODER_GPIO_A = 14
-ENCODER_GPIO_B = 15
+ENCODER_GPIO_A = 24
+ENCODER_GPIO_B = 23
 ENCODER_GPIO_BUTTON = 4
 
 def _onButtonPressed(encoder):
-	print("pressed")
 	encoder.pressed = True
+	sleep(.8)
+	encoder.pressed = False
 
 def setupEncoder():
 	GPIO.setmode(GPIO.BCM)
@@ -17,7 +18,7 @@ def setupEncoder():
 
 	GPIO.setup(ENCODER_GPIO_BUTTON, GPIO.IN)
 
-	GPIO.add_event_detect(ENCODER_GPIO_BUTTON, GPIO.FALLING, bouncetime=30, callback=lambda _: _onButtonPressed(encoder))
+	GPIO.add_event_detect(ENCODER_GPIO_BUTTON, GPIO.FALLING, bouncetime=100, callback=lambda _: _onButtonPressed(encoder))
 	encoder.pressed = False
 	return encoder
 

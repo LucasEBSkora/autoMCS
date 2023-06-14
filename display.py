@@ -19,8 +19,10 @@ class Display:
         self.__oled.show()
         self.__img = Image.new("1", (self.__oled.width, self.__oled.height))
         self.__draw = ImageDraw.Draw(self.__img)
+        self.__top_text = None
 
     def clearDisplay(self):
+        self.__top_text = None
         self.__draw.rectangle((0,0,self.__oled.width,self.__oled.height), fill=0)
         self.__oled.image(self.__img)
         self.__oled.show()
@@ -28,15 +30,27 @@ class Display:
     def drawTitle(self):
         self.__draw.rectangle((0,0, self.__oled.width, self.__oled.height), fill=0)
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-        self.__draw.text((0, 20), "AutoMCS",  font=font, fill=255)
+        self.__draw.text((0, 20), "AutoMCS", font=font, fill=255)
+
+        if self.__top_text != None:
+            font_top = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 15)
+            self.__draw.text((10, 0), self.__top_text, font=font_top, fill=255)
+
         self.__oled.image(self.__img)
         self.__oled.show()
+
+    def setTopText(self, text):
+        self.__top_text = text
 
     def drawMenu(self, opts, selected = 0):
         self.__draw.rectangle((0,0, self.__oled.width, self.__oled.height), fill=0)
         selected = selected % len(opts)
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-        self.__draw.text((0, 20), "AutoMCS",  font=font, fill=255)
+        self.__draw.text((0, 20), "AutoMCS", font=font, fill=255)
+
+        if self.__top_text != None:
+            font_top = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 15)
+            self.__draw.text((10, 0), self.__top_text, font=font_top, fill=255)
 
         self.__draw.rectangle((0,48,self.__oled.width,48+16), fill=255)
         self.__draw.text((2, 50), "<", fill=0)
