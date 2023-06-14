@@ -7,6 +7,9 @@ import random
 import states
 from board_reader import BoardReader
 from board_comparator import boardPiecePositionsIdentical
+from display import Display
+from encoder import setupEncoder, selectOptionEncoder
+from time import sleep
 
 def atoi(value: any, default: int = 0) -> int:
 	try:
@@ -21,7 +24,10 @@ session = berserk.TokenSession(token=token)
 client = berserk.Client(session)
 
 UsePhysicalBoard = False
+UseDisplay = True
 reader = None
+display = None
+encoder = None
 
 def physical_board_in_desired_state(board: chess.Board):
 	reader.updateBoard()
@@ -81,13 +87,19 @@ def print_choices_menu(state: states.GameState) -> None:
 		print(f"{i + 1} - {action.value}")
 
 def handle_user_choice(state: states.GameState, board: chess.Board, game_id) -> states.GameState:
-	print_choices_menu(state)
-	while (opt := atoi(input("Choose your action: "))) not in range(1, len(states.TRANSITIONS[state].keys()) + 1):
-		print("Please, choose a valid action (only the action number)!")
+	global encoder
+	global display
+	if UseDisplay:
+		menu = [opt.value for opt in states.TRANSITIONS[state].keys()]
+		opt = selectOptionEncoder(menu, display, encoder)
+	else:
 		print_choices_menu(state)
-			
+		while (opt := atoi(input("Choose your action: "))) not in range(1, len(states.TRANSITIONS[state].keys()) + 1):
+			print("Please, choose a valid action (only the action number)!")
+			print_choices_menu(state)
+
 	action = list(states.TRANSITIONS[state].keys())[opt - 1]
-			
+
 	if action == states.GameAction.MOVE:
 		handle_move(board, game_id)
 	elif action == states.GameAction.OFFER_DRAW:
@@ -152,13 +164,18 @@ def handle_move(board: chess.Board, game_id: str):
 
 def create_new_game_ai():
 	color = random.choice(["black", "white"])
-	while int(level := input("Select AI level [1-8]: ")) not in range(1, 9): pass
+	if UseDisplay:
+		global display
+		global encoder
+		level = selectOptionEncoder(["AI Level: "+str(val) for val in range(1, 9)], display, encoder)
+	else:
+		while int(level := input("Select AI level [1-8]: ")) not in range(1, 9): pass
 	game = client.challenges.create_ai(level=level, color=color)
 	game_id = game["id"]
 	state = states.start_game()
 	print(f"https://lichess.org/{game_id}")
 	game_stream = client.board.stream_game_state(game_id)
-	full_game = next(game_stream) 
+	full_game = next(game_stream)
 	print(full_game)
 	board = chess.Board(game["fen"])
 	print(board)
@@ -234,20 +251,38 @@ def print_menu() -> str:
 	return input("1- New game against AI\n2- New game against player\n3- Quit\n")
 
 def print_interface_option():
-	option = input("1- play on command line\n2- Play using AutoMCS board\n")
+	if UseDisplay:
+		global display
+		global encoder
+		menu = ["Play on cmd", "Play on board"]
+		option = selectOptionEncoder(menu, display, encoder)
+	else:
+		option = input("1- play on command line\n2- Play using AutoMCS board\n")
 	if atoi(option) == 2:
 		global UsePhysicalBoard
 		UsePhysicalBoard = True
 
 def main() -> None:
+	if UseDisplay:
+		global display
+		global encoder
+		display = Display()
+		encoder = setupEncoder()
+		display.drawTitle()
 	print_interface_option()
 	if UsePhysicalBoard:
 		print("initializing autoMCS computer vision module, please wait...")
 		global reader
 		reader = BoardReader(resolution = (1920, 1296))
-	while (opt := print_menu()) != "3":
-		if opt == "1": create_new_game_ai()
-		if opt == "2": create_new_game_player()
-
+	if UseDisplay:
+		menu = ["Play against AI", "Play against player", "Quit"]
+		while (opt := selectOptionEncoder(menu, display, encoder)) != 3:
+			if opt == 1: create_new_game_ai()
+			if opt == 2: create_new_game_player()
+	else:
+		while (opt := print_menu()) != "3":
+			if opt == "1": create_new_game_ai()
+			if opt == "2": create_new_game_player()
 if __name__ == "__main__":
 	main()
+
