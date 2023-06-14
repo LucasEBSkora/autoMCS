@@ -63,11 +63,11 @@ def send_serial(board, move):
 	x_mm = real_pos[x1][y1][0]
 	y_mm = real_pos[x1][y1][1]
 	msg.append(x1)
-	msg.append(ord('|')
+	msg.append(ord('|'))
 	msg.append(y1)
 	msg.append(ord('|'))
 	#to square
-	msg.append(ord(move[2]) + 2 0 ord('a'))
+	msg.append(ord(move[2]) + 2 + ord('a'))
 	msg.append(ord('|'))
 	msg.append(int(move[3]) + 1)
 	msg.append(ord('|'))
@@ -115,7 +115,7 @@ def handle_lichess_gameState(state: states.GameState, event: dict[str, Any], boa
 		state = states.handle_transition(state, states.GameAction.DECLINE)
 	else:
 		state = states.handle_transition(state, states.GameAction.MOVE)
-	return state0
+	return state
 
 def print_choices_menu(state: states.GameState) -> None:
 	print(state)
