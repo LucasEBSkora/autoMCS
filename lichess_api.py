@@ -183,7 +183,7 @@ def create_new_game_ai():
 	if UsePhysicalBoard:
 		print("checking if board in starting state...")
 		put_physical_board_desired_state(board)
-	color_id = 1 if color == "black" else 0 
+	color_id = 1 if color == "black" else 0
 	print("---------------------------")
 
 	try:
@@ -212,7 +212,7 @@ def create_new_game_player():
 	stream = client.board.stream_incoming_events()
 	client.board.seek(time=15, increment=60, color=color)
 	for e in stream:
-		if e["type"] == "gameStart":
+		if e["type"] == "gameStart" and e["game"]["source"] != "ai" and e["game"]["status"]["name"] == "started":
 			game = e["game"]
 			game_id = game["id"]
 			state = states.start_game()
@@ -246,6 +246,7 @@ def create_new_game_player():
 				print(f"Error occured: {err}")
 				print("Game aborted")
 				raise err
+		return
 
 def print_menu() -> str:
 	return input("1- New game against AI\n2- New game against player\n3- Quit\n")
